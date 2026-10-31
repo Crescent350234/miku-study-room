@@ -18,7 +18,7 @@
 ## 安装
 
 1. 解压压缩包到任意目录（路径不要有特殊符号）
-2. 双击 **`安装.bat`**
+2. 双击 **`Miku Study Room 安装器.exe`**（或 `安装.bat`）
 3. 安装脚本会：
    - 找到 Wallpaper Engine
    - 把壁纸工程复制到 `projects\myprojects\Miku Study Room`
