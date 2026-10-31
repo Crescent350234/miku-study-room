@@ -7,6 +7,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
 
 public class AiSettingsForm : Form
 {
@@ -178,12 +179,44 @@ public class AiSettingsForm : Form
         Controls.Add(btnBg);
 
         StyleUi(this);
-        btnSave.BackColor = Color.FromArgb(56, 138, 130);
+        StyleDark(this);
+        btnSave.BackColor = Color.FromArgb(58, 167, 154);
         btnSave.ForeColor = Color.White;
         btnSave.FlatAppearance.BorderSize = 0;
         LoadIni();
     }
 
+
+    private static void StyleDark(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            Label l = c as Label;
+            if (l != null) l.ForeColor = Color.FromArgb(220, 235, 231);
+            CheckBox cb = c as CheckBox;
+            if (cb != null) cb.ForeColor = Color.FromArgb(220, 235, 231);
+            TextBox tb = c as TextBox;
+            if (tb != null)
+            {
+                tb.BackColor = Color.FromArgb(30, 46, 42);
+                tb.ForeColor = Color.FromArgb(236, 246, 243);
+            }
+            ComboBox cmb = c as ComboBox;
+            if (cmb != null)
+            {
+                cmb.BackColor = Color.FromArgb(30, 46, 42);
+                cmb.ForeColor = Color.FromArgb(236, 246, 243);
+            }
+            Button b = c as Button;
+            if (b != null)
+            {
+                b.BackColor = Color.FromArgb(38, 56, 51);
+                b.ForeColor = Color.FromArgb(230, 242, 238);
+                b.FlatAppearance.BorderColor = Color.FromArgb(72, 102, 94);
+            }
+            StyleDark(c);
+        }
+    }
 
     private static void StyleUi(Control root)
     {
@@ -211,6 +244,14 @@ public class AiSettingsForm : Form
             if (cb != null) cb.Font = new Font("Microsoft YaHei UI", 10f);
             StyleUi(c);
         }
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        AcrylicHelper.Enable(this.Handle, 18, 30, 28, 205);
+        this.Opacity = 0.98;
+        this.BackColor = Color.FromArgb(24, 38, 35);
     }
 
     private Label MakeLabel(string text, int x, int y)
@@ -750,5 +791,58 @@ public class BgForm : Form
                 MessageBox.Show(this, "写入失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+    }
+}
+
+internal static class AcrylicHelper
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AccentPolicy
+    {
+        public int AccentState;
+        public int AccentFlags;
+        public int GradientColor;
+        public int AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowCompositionAttributeData
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    public static void Enable(IntPtr hwnd, int r, int g, int b, int alpha)
+    {
+        try
+        {
+            int gradient = (alpha << 24) | (b << 16) | (g << 8) | r;
+            AccentPolicy policy = new AccentPolicy();
+            policy.AccentState = 4; // ACCENT_ENABLE_ACRYLICBLURBEHIND
+            policy.AccentFlags = 2;
+            policy.GradientColor = gradient;
+
+            int size = Marshal.SizeOf(policy);
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            Marshal.StructureToPtr(policy, ptr, false);
+
+            WindowCompositionAttributeData data = new WindowCompositionAttributeData();
+            data.Attribute = 19; // WCA_ACCENT_POLICY
+            data.Data = ptr;
+            data.SizeOfData = size;
+            SetWindowCompositionAttribute(hwnd, ref data);
+            Marshal.FreeHGlobal(ptr);
+
+            int round = 2; // DWMWCP_ROUND
+            DwmSetWindowAttribute(hwnd, 33, ref round, sizeof(int));
+        }
+        catch { }
     }
 }
