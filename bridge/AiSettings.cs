@@ -49,20 +49,20 @@ public class AiSettingsForm : Form
         FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         Font = new Font("Microsoft YaHei UI", 9.5f);
-        BackColor = Color.FromArgb(14, 18, 17);
+        BackColor = Color.FromArgb(19, 20, 23);
         DoubleBuffered = true;
 
         Label title = new Label();
         title.Text = "Miku Study Room";
         title.Font = new Font("Microsoft YaHei UI", 17f, FontStyle.Bold);
-        title.ForeColor = Color.FromArgb(236, 244, 241);
+        title.ForeColor = Color.FromArgb(242, 245, 244);
         title.Location = new Point(30, 24);
         title.AutoSize = true;
         Controls.Add(title);
 
         Label sub = new Label();
         sub.Text = "AI 主题与网易云快捷键";
-        sub.ForeColor = Color.FromArgb(126, 148, 141);
+        sub.ForeColor = Color.FromArgb(150, 158, 160);
         sub.Location = new Point(32, 62);
         sub.AutoSize = true;
         Controls.Add(sub);
@@ -71,7 +71,7 @@ public class AiSettingsForm : Form
         close.Text = "×";
         close.Font = new Font("Microsoft YaHei UI", 13f);
         close.ForeColor = Color.FromArgb(180, 198, 192);
-        close.BackColor = Color.FromArgb(14, 18, 17);
+        close.BackColor = Color.FromArgb(19, 20, 23);
         close.FlatStyle = FlatStyle.Flat;
         close.FlatAppearance.BorderSize = 0;
         close.Location = new Point(566, 18);
@@ -86,7 +86,7 @@ public class AiSettingsForm : Form
 
         chkEnabled = new CheckBox();
         chkEnabled.Text = "启用 AI 主题（按歌曲生成配色）";
-        chkEnabled.ForeColor = Color.FromArgb(214, 228, 223);
+        chkEnabled.ForeColor = Color.FromArgb(224, 230, 229);
         chkEnabled.Location = new Point(30, 134);
         chkEnabled.AutoSize = true;
         Controls.Add(chkEnabled);
@@ -130,7 +130,7 @@ public class AiSettingsForm : Form
 
         lblStatus = new Label();
         lblStatus.Text = "";
-        lblStatus.ForeColor = Color.FromArgb(126, 148, 141);
+        lblStatus.ForeColor = Color.FromArgb(150, 158, 160);
         lblStatus.Location = new Point(30, 376);
         lblStatus.AutoSize = true;
         Controls.Add(lblStatus);
@@ -162,7 +162,7 @@ public class AiSettingsForm : Form
 
         Label hkHint = new Label();
         hkHint.Text = "格式：ctrl+alt+p / ctrl+shift+right / media_next";
-        hkHint.ForeColor = Color.FromArgb(100, 120, 114);
+        hkHint.ForeColor = Color.FromArgb(120, 128, 130);
         hkHint.Location = new Point(30, 592);
         hkHint.AutoSize = true;
         Controls.Add(hkHint);
@@ -197,7 +197,7 @@ public class AiSettingsForm : Form
 
         Label foot = new Label();
         foot.Text = "Key 只保存在本机 bridge\\ai.ini";
-        foot.ForeColor = Color.FromArgb(88, 106, 100);
+        foot.ForeColor = Color.FromArgb(104, 112, 114);
         foot.Location = new Point(30, 700);
         foot.AutoSize = true;
         Controls.Add(foot);
@@ -215,8 +215,8 @@ public class AiSettingsForm : Form
         this.MouseDown += startDrag;
 
         StyleMinimal(this);
-        btnSave.BackColor = Color.FromArgb(127, 227, 212);
-        btnSave.ForeColor = Color.FromArgb(12, 26, 22);
+        btnSave.BackColor = Color.FromArgb(143, 240, 226);
+        btnSave.ForeColor = Color.FromArgb(12, 22, 20);
         btnSave.FlatAppearance.BorderSize = 0;
 
         LoadIni();
@@ -227,7 +227,7 @@ public class AiSettingsForm : Form
         Label l = new Label();
         l.Text = text;
         l.Font = new Font("Microsoft YaHei UI", 11f, FontStyle.Bold);
-        l.ForeColor = Color.FromArgb(206, 224, 218);
+        l.ForeColor = Color.FromArgb(226, 233, 231);
         l.Location = new Point(x, y);
         l.AutoSize = true;
         return l;
@@ -237,7 +237,7 @@ public class AiSettingsForm : Form
     {
         Label l = new Label();
         l.Text = text;
-        l.ForeColor = Color.FromArgb(128, 150, 143);
+        l.ForeColor = Color.FromArgb(150, 158, 160);
         l.Location = new Point(x, y);
         l.AutoSize = true;
         return l;
@@ -252,7 +252,7 @@ public class AiSettingsForm : Form
             {
                 b.FlatStyle = FlatStyle.Flat;
                 b.FlatAppearance.BorderSize = 0;
-                b.BackColor = Color.FromArgb(26, 32, 30);
+                b.BackColor = Color.FromArgb(33, 36, 41);
                 b.ForeColor = Color.FromArgb(220, 234, 229);
                 if (b.Height < 32) b.Height = 32;
                 b.Cursor = Cursors.Hand;
@@ -261,7 +261,7 @@ public class AiSettingsForm : Form
             if (tb != null)
             {
                 tb.BorderStyle = BorderStyle.None;
-                tb.BackColor = Color.FromArgb(24, 30, 28);
+                tb.BackColor = Color.FromArgb(29, 31, 35);
                 tb.ForeColor = Color.FromArgb(236, 246, 242);
                 tb.Font = new Font("Microsoft YaHei UI", 10f);
             }
@@ -269,7 +269,7 @@ public class AiSettingsForm : Form
             if (cb != null)
             {
                 cb.FlatStyle = FlatStyle.Flat;
-                cb.BackColor = Color.FromArgb(24, 30, 28);
+                cb.BackColor = Color.FromArgb(29, 31, 35);
                 cb.ForeColor = Color.FromArgb(236, 246, 242);
                 cb.Font = new Font("Microsoft YaHei UI", 10f);
             }
