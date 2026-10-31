@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Net;
@@ -37,7 +38,7 @@ public class AiSettingsForm : Form
         hotkeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hotkeys.ini");
 
         Text = "Miku 壁纸 · 设置（AI 与快捷键）";
-        ClientSize = new Size(500, 575);
+        ClientSize = new Size(520, 640);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -110,7 +111,7 @@ public class AiSettingsForm : Form
 
         btnSave = new Button();
         btnSave.Text = "保存";
-        btnSave.Location = new Point(380, 500);
+        btnSave.Location = new Point(400, 560);
         btnSave.Width = 94;
         btnSave.Height = 32;
         btnSave.Click += delegate { SaveAndClose(); };
@@ -118,7 +119,7 @@ public class AiSettingsForm : Form
 
         Button btnCancel = new Button();
         btnCancel.Text = "取消";
-        btnCancel.Location = new Point(276, 500);
+        btnCancel.Location = new Point(296, 560);
         btnCancel.Width = 94;
         btnCancel.Height = 32;
         btnCancel.Click += delegate { Close(); };
@@ -127,7 +128,7 @@ public class AiSettingsForm : Form
         Label foot = new Label();
         foot.Text = "Key 只保存在本机 bridge\\ai.ini，不会上传到别处。";
         foot.ForeColor = Color.FromArgb(140, 140, 150);
-        foot.Location = new Point(26, 545);
+        foot.Location = new Point(26, 610);
         foot.AutoSize = true;
         Controls.Add(foot);
 
@@ -153,14 +154,15 @@ public class AiSettingsForm : Form
         Label hkHint = new Label();
         hkHint.Text = "格式示例：ctrl+alt+p、ctrl+shift+right、media_next";
         hkHint.ForeColor = Color.FromArgb(140, 140, 150);
-        hkHint.Location = new Point(26, 460);
-        hkHint.AutoSize = true;
+        hkHint.Location = new Point(26, 500);
+        hkHint.AutoSize = false;
+        hkHint.Width = 460;
         Controls.Add(hkHint);
 
         Button btnHkDefault = new Button();
         btnHkDefault.Text = "恢复默认";
-        btnHkDefault.Location = new Point(380, 420);
-        btnHkDefault.Width = 90;
+        btnHkDefault.Location = new Point(120, 462);
+        btnHkDefault.Width = 110;
         btnHkDefault.Click += delegate {
             txtNext.Text = "ctrl+alt+right";
             txtPrev.Text = "ctrl+alt+left";
@@ -168,7 +170,47 @@ public class AiSettingsForm : Form
         };
         Controls.Add(btnHkDefault);
 
+        Button btnBg = new Button();
+        btnBg.Text = "自定义背景…";
+        btnBg.Location = new Point(245, 462);
+        btnBg.Width = 140;
+        btnBg.Click += delegate { using (var f = new BgForm()) f.ShowDialog(this); };
+        Controls.Add(btnBg);
+
+        StyleUi(this);
+        btnSave.BackColor = Color.FromArgb(56, 138, 130);
+        btnSave.ForeColor = Color.White;
+        btnSave.FlatAppearance.BorderSize = 0;
         LoadIni();
+    }
+
+
+    private static void StyleUi(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            Button b = c as Button;
+            if (b != null)
+            {
+                b.FlatStyle = FlatStyle.Flat;
+                b.FlatAppearance.BorderColor = Color.FromArgb(214, 222, 222);
+                b.FlatAppearance.BorderSize = 1;
+                b.BackColor = Color.FromArgb(244, 247, 247);
+                b.ForeColor = Color.FromArgb(52, 64, 64);
+                if (b.Height < 30) b.Height = 30;
+                b.Cursor = Cursors.Hand;
+            }
+            TextBox tb = c as TextBox;
+            if (tb != null)
+            {
+                tb.BorderStyle = BorderStyle.FixedSingle;
+                tb.Font = new Font("Microsoft YaHei UI", 10f);
+                tb.BackColor = Color.White;
+            }
+            ComboBox cb = c as ComboBox;
+            if (cb != null) cb.Font = new Font("Microsoft YaHei UI", 10f);
+            StyleUi(c);
+        }
     }
 
     private Label MakeLabel(string text, int x, int y)
@@ -415,5 +457,298 @@ public class AiSettingsForm : Form
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.Run(new AiSettingsForm());
+    }
+}
+
+
+public class BgForm : Form
+{
+    private Label lbl;
+    private ProgressBar bar;
+    private Button btnVideo;
+    private Button btnImage;
+
+    public BgForm()
+    {
+        Text = "自定义背景";
+        ClientSize = new Size(520, 250);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
+        Font = new Font("Microsoft YaHei UI", 9.5f);
+        BackColor = Color.FromArgb(250, 250, 252);
+
+        Label title = new Label();
+        title.Text = "把视频或图片换成壁纸背景";
+        title.Font = new Font("Microsoft YaHei UI", 12f, FontStyle.Bold);
+        title.Location = new Point(22, 18);
+        title.AutoSize = true;
+        Controls.Add(title);
+
+        Label hint = new Label();
+        hint.Text = "视频会转成 VP9 WebM（需要 ffmpeg，首次会提示安装）。\n输出到已安装壁纸工程的 custom 文件夹。";
+        hint.ForeColor = Color.FromArgb(110, 110, 120);
+        hint.Location = new Point(24, 48);
+        hint.AutoSize = true;
+        Controls.Add(hint);
+
+        btnVideo = new Button();
+        btnVideo.Text = "选择视频并转换";
+        btnVideo.Location = new Point(24, 96);
+        btnVideo.Width = 220;
+        btnVideo.Height = 36;
+        btnVideo.Click += delegate { PickVideo(); };
+        Controls.Add(btnVideo);
+
+        btnImage = new Button();
+        btnImage.Text = "选择图片";
+        btnImage.Location = new Point(258, 96);
+        btnImage.Width = 220;
+        btnImage.Height = 36;
+        btnImage.Click += delegate { PickImage(); };
+        Controls.Add(btnImage);
+
+        bar = new ProgressBar();
+        bar.Location = new Point(24, 146);
+        bar.Width = 454;
+        bar.Height = 16;
+        bar.Style = ProgressBarStyle.Continuous;
+        bar.Value = 0;
+        Controls.Add(bar);
+
+        lbl = new Label();
+        lbl.Text = "选择文件开始。";
+        lbl.Location = new Point(24, 170);
+        lbl.Width = 460;
+        lbl.Height = 40;
+        lbl.ForeColor = Color.FromArgb(90, 100, 100);
+        Controls.Add(lbl);
+
+        Button close = new Button();
+        close.Text = "关闭";
+        close.Location = new Point(384, 208);
+        close.Width = 94;
+        close.Click += delegate { Close(); };
+        Controls.Add(close);
+    }
+
+    private void SetStatus(string s)
+    {
+        if (lbl.IsDisposed) return;
+        if (lbl.InvokeRequired) { lbl.BeginInvoke(new Action<string>(SetStatus), s); return; }
+        lbl.Text = s;
+    }
+
+    private void SetBusy(bool busy)
+    {
+        if (btnVideo.IsDisposed) return;
+        if (btnVideo.InvokeRequired) { btnVideo.BeginInvoke(new Action<bool>(SetBusy), busy); return; }
+        btnVideo.Enabled = !busy;
+        btnImage.Enabled = !busy;
+        bar.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
+        if (!busy) bar.Value = 0;
+    }
+
+    private string CustomDir()
+    {
+        string we = null;
+        try
+        {
+            string ini = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\installer.ini");
+            if (File.Exists(ini))
+            {
+                foreach (string line in File.ReadAllLines(ini))
+                {
+                    if (line.StartsWith("we=", StringComparison.OrdinalIgnoreCase)) { we = line.Substring(3).Trim(); break; }
+                }
+            }
+        }
+        catch { }
+
+        var candidates = new List<string>();
+        if (!string.IsNullOrEmpty(we)) candidates.Add(we);
+        candidates.Add(@"C:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine");
+        candidates.Add(@"C:\Program Files\Steam\steamapps\common\wallpaper_engine");
+        candidates.Add(@"D:\Steam\steamapps\common\wallpaper_engine");
+        candidates.Add(@"D:\SteamLibrary\steamapps\common\wallpaper_engine");
+        candidates.Add(@"E:\Steam\steamapps\common\wallpaper_engine");
+
+        foreach (string c in candidates)
+        {
+            string proj = Path.Combine(c, @"projects\myprojects\Miku Study Room");
+            if (Directory.Exists(proj))
+            {
+                string custom = Path.Combine(proj, "custom");
+                Directory.CreateDirectory(custom);
+                return custom;
+            }
+        }
+        return null;
+    }
+
+    private string FindFfmpeg()
+    {
+        foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
+        {
+            try
+            {
+                if (dir.Trim().Length == 0) continue;
+                string f = Path.Combine(dir.Trim(), "ffmpeg.exe");
+                if (File.Exists(f)) return f;
+            }
+            catch { }
+        }
+        try
+        {
+            string winget = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WinGet\Packages");
+            if (Directory.Exists(winget))
+            {
+                foreach (string d in Directory.GetDirectories(winget, "Gyan.FFmpeg*"))
+                {
+                    foreach (string f in Directory.GetFiles(d, "ffmpeg.exe", SearchOption.AllDirectories))
+                        return f;
+                }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private string EnsureFfmpeg()
+    {
+        string ff = FindFfmpeg();
+        if (ff != null) return ff;
+
+        var r = MessageBox.Show(this,
+            "没有找到 ffmpeg，转换视频需要它。\n\n是否现在用 winget 自动安装？",
+            "需要 ffmpeg", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (r != DialogResult.Yes) return null;
+
+        try
+        {
+            SetStatus("正在安装 ffmpeg，请稍候…");
+            var psi = new ProcessStartInfo("winget",
+                "install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements");
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+            using (var p = Process.Start(psi))
+            {
+                p.WaitForExit(300000);
+            }
+            ff = FindFfmpeg();
+        }
+        catch (Exception ex)
+        {
+            SetStatus("安装失败：" + ex.Message);
+        }
+
+        if (ff == null) MessageBox.Show(this, "ffmpeg 仍未找到。请手动安装后重试。", "失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return ff;
+    }
+
+    private void PickVideo()
+    {
+        using (var dlg = new OpenFileDialog())
+        {
+            dlg.Title = "选择视频";
+            dlg.Filter = "视频文件|*.mp4;*.mkv;*.mov;*.avi;*.flv;*.wmv;*.webm|所有文件|*.*";
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+            string src = dlg.FileName;
+            string outDir = CustomDir();
+            if (outDir == null)
+            {
+                MessageBox.Show(this, "找不到已安装的壁纸工程，请先用安装器安装一次。", "未安装", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            SetBusy(true);
+            SetStatus("准备转换…");
+            Thread t = new Thread(delegate ()
+            {
+                try
+                {
+                    string ff = EnsureFfmpeg();
+                    if (ff == null) { SetStatus("已取消。"); return; }
+
+                    string outWebm = Path.Combine(outDir, "bg.webm");
+                    SetStatus("正在转换视频，越长越慢…");
+                    var psi = new ProcessStartInfo(ff,
+                        "-y -i \"" + src + "\" -c:v libvpx-vp9 -b:v 3M -an -vf \"scale=1920:-2\" \"" + outWebm + "\"");
+                    psi.UseShellExecute = false;
+                    psi.CreateNoWindow = true;
+                    psi.RedirectStandardOutput = true;
+                    psi.RedirectStandardError = true;
+                    using (var p = Process.Start(psi))
+                    {
+                        p.StandardOutput.ReadToEnd();
+                        p.StandardError.ReadToEnd();
+                        p.WaitForExit();
+                    }
+                    if (!File.Exists(outWebm))
+                    {
+                        SetStatus("转换失败，请换一个视频。");
+                        return;
+                    }
+
+                    // 抽第一帧当封面
+                    try
+                    {
+                        var psi2 = new ProcessStartInfo(ff,
+                            "-y -i \"" + src + "\" -frames:v 1 -q:v 2 \"" + Path.Combine(outDir, "bg.jpg") + "\"");
+                        psi2.UseShellExecute = false;
+                        psi2.CreateNoWindow = true;
+                        using (var p2 = Process.Start(psi2)) p2.WaitForExit(30000);
+                    }
+                    catch { }
+
+                    SetStatus("完成。打开壁纸设置 → 背景 → 选择「自定义」。");
+                    MessageBox.Show(this, "背景已转换并写入壁纸工程。\n\n打开壁纸设置 → 背景 → 选择「自定义」。",
+                        "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    SetStatus("失败：" + ex.Message);
+                }
+                finally
+                {
+                    SetBusy(false);
+                }
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+    }
+
+    private void PickImage()
+    {
+        using (var dlg = new OpenFileDialog())
+        {
+            dlg.Title = "选择图片";
+            dlg.Filter = "图片|*.jpg;*.jpeg;*.png;*.bmp;*.webp|所有文件|*.*";
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+            string outDir = CustomDir();
+            if (outDir == null)
+            {
+                MessageBox.Show(this, "找不到已安装的壁纸工程，请先用安装器安装一次。", "未安装", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            try
+            {
+                string ext = Path.GetExtension(dlg.FileName).ToLowerInvariant();
+                string target = Path.Combine(outDir, ext == ".png" ? "bg.png" : "bg.jpg");
+                File.Copy(dlg.FileName, target, true);
+                SetStatus("图片已写入：" + Path.GetFileName(target));
+                MessageBox.Show(this, "图片已写入壁纸工程。\n\n打开壁纸设置 → 背景 → 选择「自定义」。",
+                    "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "写入失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }
 }
