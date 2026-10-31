@@ -18,7 +18,11 @@ public class AiSettingsForm : Form
     private Button btnSave;
     private Button btnTest;
     private Button btnKey;
+    private TextBox txtNext;
+    private TextBox txtPrev;
+    private TextBox txtPause;
     private readonly string iniPath;
+    private readonly string hotkeyPath;
 
     private static readonly Dictionary<string, string[]> Presets = new Dictionary<string, string[]>
     {
@@ -30,9 +34,10 @@ public class AiSettingsForm : Form
     public AiSettingsForm()
     {
         iniPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ai.ini");
+        hotkeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hotkeys.ini");
 
-        Text = "Miku 壁纸 · AI 主题设置";
-        ClientSize = new Size(500, 424);
+        Text = "Miku 壁纸 · 设置（AI 与快捷键）";
+        ClientSize = new Size(500, 575);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -105,7 +110,7 @@ public class AiSettingsForm : Form
 
         btnSave = new Button();
         btnSave.Text = "保存";
-        btnSave.Location = new Point(380, 364);
+        btnSave.Location = new Point(380, 500);
         btnSave.Width = 94;
         btnSave.Height = 32;
         btnSave.Click += delegate { SaveAndClose(); };
@@ -113,7 +118,7 @@ public class AiSettingsForm : Form
 
         Button btnCancel = new Button();
         btnCancel.Text = "取消";
-        btnCancel.Location = new Point(276, 364);
+        btnCancel.Location = new Point(276, 500);
         btnCancel.Width = 94;
         btnCancel.Height = 32;
         btnCancel.Click += delegate { Close(); };
@@ -122,9 +127,46 @@ public class AiSettingsForm : Form
         Label foot = new Label();
         foot.Text = "Key 只保存在本机 bridge\\ai.ini，不会上传到别处。";
         foot.ForeColor = Color.FromArgb(140, 140, 150);
-        foot.Location = new Point(26, 330);
+        foot.Location = new Point(26, 545);
         foot.AutoSize = true;
         Controls.Add(foot);
+
+        Label hkTitle = new Label();
+        hkTitle.Text = "网易云快捷键（需与客户端设置一致）";
+        hkTitle.Font = new Font("Microsoft YaHei UI", 10f, FontStyle.Bold);
+        hkTitle.Location = new Point(24, 326);
+        hkTitle.AutoSize = true;
+        Controls.Add(hkTitle);
+
+        Label h1 = MakeLabel("下一首", 26, 360);
+        txtNext = MakeText(120, 356, 240);
+        Controls.Add(txtNext);
+
+        Label h2 = MakeLabel("上一首", 26, 394);
+        txtPrev = MakeText(120, 390, 240);
+        Controls.Add(txtPrev);
+
+        Label h3 = MakeLabel("播放/暂停", 26, 428);
+        txtPause = MakeText(120, 424, 240);
+        Controls.Add(txtPause);
+
+        Label hkHint = new Label();
+        hkHint.Text = "格式示例：ctrl+alt+p、ctrl+shift+right、media_next";
+        hkHint.ForeColor = Color.FromArgb(140, 140, 150);
+        hkHint.Location = new Point(26, 460);
+        hkHint.AutoSize = true;
+        Controls.Add(hkHint);
+
+        Button btnHkDefault = new Button();
+        btnHkDefault.Text = "恢复默认";
+        btnHkDefault.Location = new Point(380, 420);
+        btnHkDefault.Width = 90;
+        btnHkDefault.Click += delegate {
+            txtNext.Text = "ctrl+alt+right";
+            txtPrev.Text = "ctrl+alt+left";
+            txtPause.Text = "ctrl+alt+p";
+        };
+        Controls.Add(btnHkDefault);
 
         LoadIni();
     }
@@ -192,6 +234,29 @@ public class AiSettingsForm : Form
             cbPreset.SelectedIndex = 2;
 
         lblStatus.Text = chkEnabled.Checked ? "当前：已启用" : "当前：未启用（免费封面取色）";
+
+        txtNext.Text = "ctrl+alt+right";
+        txtPrev.Text = "ctrl+alt+left";
+        txtPause.Text = "ctrl+alt+p";
+        try
+        {
+            if (File.Exists(hotkeyPath))
+            {
+                foreach (string raw in File.ReadAllLines(hotkeyPath, Encoding.UTF8))
+                {
+                    string line = raw.Trim();
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string k = line.Substring(0, eq).Trim().ToLowerInvariant();
+                    string v = line.Substring(eq + 1).Trim();
+                    if (v.Length == 0) continue;
+                    if (k == "next") txtNext.Text = v;
+                    else if (k == "prev") txtPrev.Text = v;
+                    else if (k == "playpause") txtPause.Text = v;
+                }
+            }
+        }
+        catch { }
     }
 
     private void SaveAndClose()
@@ -206,7 +271,16 @@ public class AiSettingsForm : Form
             sb.AppendLine("model=" + txtModel.Text.Trim());
             File.WriteAllText(iniPath, sb.ToString(), new UTF8Encoding(false));
 
-            MessageBox.Show(this, "已保存。\n\n壁纸会在 15 秒内自动读取新配置；\n切一首歌就会生成 AI 主题。",
+            StringBuilder hb = new StringBuilder();
+            hb.AppendLine("# 网易云全局快捷键（格式：ctrl+alt+p / media_next）");
+            hb.AppendLine("next=" + txtNext.Text.Trim());
+            hb.AppendLine("prev=" + txtPrev.Text.Trim());
+            hb.AppendLine("playpause=" + txtPause.Text.Trim());
+            File.WriteAllText(hotkeyPath, hb.ToString(), new UTF8Encoding(false));
+
+            RestartBridge();
+
+            MessageBox.Show(this, "已保存，并已重启控制桥。\n\n如果快捷键仍不生效，请检查网易云：\n设置 → 快捷键 → 全局快捷键是否开启、组合键是否一致。",
                 "保存成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
             Close();
         }
@@ -214,6 +288,24 @@ public class AiSettingsForm : Form
         {
             MessageBox.Show(this, "保存失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private void RestartBridge()
+    {
+        try
+        {
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("bridge"))
+            {
+                try { p.Kill(); } catch { }
+            }
+            Thread.Sleep(600);
+            var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bridge.exe"));
+            psi.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            psi.UseShellExecute = true;
+            psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch { }
     }
 
     private void OpenKeyPage()
