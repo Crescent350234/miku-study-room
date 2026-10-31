@@ -33,137 +33,126 @@ public class AiSettingsForm : Form
         { "自定义（OpenAI 兼容）", null }
     };
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
     public AiSettingsForm()
     {
         iniPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ai.ini");
         hotkeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hotkeys.ini");
 
-        Text = "Miku 壁纸 · 设置（AI 与快捷键）";
-        ClientSize = new Size(520, 640);
+        Text = "Miku Study Room";
+        ClientSize = new Size(620, 728);
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         Font = new Font("Microsoft YaHei UI", 9.5f);
-        BackColor = Color.FromArgb(250, 250, 252);
+        BackColor = Color.FromArgb(14, 18, 17);
+        DoubleBuffered = true;
 
         Label title = new Label();
-        title.Text = "AI 主题（可选）";
-        title.Font = new Font("Microsoft YaHei UI", 14f, FontStyle.Bold);
-        title.Location = new Point(24, 18);
+        title.Text = "Miku Study Room";
+        title.Font = new Font("Microsoft YaHei UI", 17f, FontStyle.Bold);
+        title.ForeColor = Color.FromArgb(236, 244, 241);
+        title.Location = new Point(30, 24);
         title.AutoSize = true;
         Controls.Add(title);
 
         Label sub = new Label();
-        sub.Text = "不开启也能正常用：默认从专辑封面取色，完全免费。";
-        sub.ForeColor = Color.FromArgb(110, 110, 120);
-        sub.Location = new Point(26, 52);
+        sub.Text = "AI 主题与网易云快捷键";
+        sub.ForeColor = Color.FromArgb(126, 148, 141);
+        sub.Location = new Point(32, 62);
         sub.AutoSize = true;
         Controls.Add(sub);
 
+        Button close = new Button();
+        close.Text = "×";
+        close.Font = new Font("Microsoft YaHei UI", 13f);
+        close.ForeColor = Color.FromArgb(180, 198, 192);
+        close.BackColor = Color.FromArgb(14, 18, 17);
+        close.FlatStyle = FlatStyle.Flat;
+        close.FlatAppearance.BorderSize = 0;
+        close.Location = new Point(566, 18);
+        close.Size = new Size(34, 34);
+        close.Cursor = Cursors.Hand;
+        close.Click += delegate { Close(); };
+        Controls.Add(close);
+
+
+        Label aiTitle = SectionTitle("AI 主题", 30, 104);
+        Controls.Add(aiTitle);
+
         chkEnabled = new CheckBox();
         chkEnabled.Text = "启用 AI 主题（按歌曲生成配色）";
-        chkEnabled.Location = new Point(26, 84);
+        chkEnabled.ForeColor = Color.FromArgb(214, 228, 223);
+        chkEnabled.Location = new Point(30, 134);
         chkEnabled.AutoSize = true;
         Controls.Add(chkEnabled);
 
-        Label l1 = MakeLabel("服务商", 26, 118);
+        Controls.Add(RowLabel("服务商", 30, 172));
         cbPreset = new ComboBox();
         cbPreset.DropDownStyle = ComboBoxStyle.DropDownList;
-        cbPreset.Location = new Point(120, 114);
-        cbPreset.Width = 340;
+        cbPreset.Location = new Point(150, 168);
+        cbPreset.Width = 430;
         foreach (string k in Presets.Keys) cbPreset.Items.Add(k);
         cbPreset.SelectedIndex = 0;
         cbPreset.SelectedIndexChanged += PresetChanged;
         Controls.Add(cbPreset);
 
-        Label l2 = MakeLabel("接口地址", 26, 156);
-        txtBase = MakeText(120, 152, 340);
+        Controls.Add(RowLabel("接口地址", 30, 212));
+        txtBase = MakeText(150, 208, 430);
         Controls.Add(txtBase);
 
-        Label l3 = MakeLabel("API Key", 26, 194);
-        txtKey = MakeText(120, 190, 340);
+        Controls.Add(RowLabel("API Key", 30, 252));
+        txtKey = MakeText(150, 248, 430);
         txtKey.UseSystemPasswordChar = true;
         Controls.Add(txtKey);
 
-        Label l4 = MakeLabel("模型", 26, 232);
-        txtModel = MakeText(120, 228, 340);
+        Controls.Add(RowLabel("模型", 30, 292));
+        txtModel = MakeText(150, 288, 430);
         Controls.Add(txtModel);
-
-        btnKey = new Button();
-        btnKey.Text = "获取 Key";
-        btnKey.Location = new Point(380, 264);
-        btnKey.Width = 80;
-        btnKey.Click += delegate { OpenKeyPage(); };
-        Controls.Add(btnKey);
 
         btnTest = new Button();
         btnTest.Text = "测试连接";
-        btnTest.Location = new Point(120, 264);
-        btnTest.Width = 110;
+        btnTest.Location = new Point(150, 330);
+        btnTest.Size = new Size(130, 34);
         btnTest.Click += delegate { TestConnection(); };
         Controls.Add(btnTest);
 
+        btnKey = new Button();
+        btnKey.Text = "获取 Key";
+        btnKey.Location = new Point(450, 330);
+        btnKey.Size = new Size(130, 34);
+        btnKey.Click += delegate { OpenKeyPage(); };
+        Controls.Add(btnKey);
+
         lblStatus = new Label();
         lblStatus.Text = "";
-        lblStatus.ForeColor = Color.FromArgb(110, 110, 120);
-        lblStatus.Location = new Point(26, 300);
+        lblStatus.ForeColor = Color.FromArgb(126, 148, 141);
+        lblStatus.Location = new Point(30, 376);
         lblStatus.AutoSize = true;
         Controls.Add(lblStatus);
 
-        btnSave = new Button();
-        btnSave.Text = "保存";
-        btnSave.Location = new Point(400, 560);
-        btnSave.Width = 94;
-        btnSave.Height = 32;
-        btnSave.Click += delegate { SaveAndClose(); };
-        Controls.Add(btnSave);
+        Controls.Add(SectionTitle("网易云快捷键", 30, 414));
 
-        Button btnCancel = new Button();
-        btnCancel.Text = "取消";
-        btnCancel.Location = new Point(296, 560);
-        btnCancel.Width = 94;
-        btnCancel.Height = 32;
-        btnCancel.Click += delegate { Close(); };
-        Controls.Add(btnCancel);
-
-        Label foot = new Label();
-        foot.Text = "Key 只保存在本机 bridge\\ai.ini，不会上传到别处。";
-        foot.ForeColor = Color.FromArgb(140, 140, 150);
-        foot.Location = new Point(26, 610);
-        foot.AutoSize = true;
-        Controls.Add(foot);
-
-        Label hkTitle = new Label();
-        hkTitle.Text = "网易云快捷键（需与客户端设置一致）";
-        hkTitle.Font = new Font("Microsoft YaHei UI", 10f, FontStyle.Bold);
-        hkTitle.Location = new Point(24, 326);
-        hkTitle.AutoSize = true;
-        Controls.Add(hkTitle);
-
-        Label h1 = MakeLabel("下一首", 26, 360);
-        txtNext = MakeText(120, 356, 240);
+        Controls.Add(RowLabel("下一首", 30, 448));
+        txtNext = MakeText(150, 444, 300);
         Controls.Add(txtNext);
 
-        Label h2 = MakeLabel("上一首", 26, 394);
-        txtPrev = MakeText(120, 390, 240);
+        Controls.Add(RowLabel("上一首", 30, 484));
+        txtPrev = MakeText(150, 480, 300);
         Controls.Add(txtPrev);
 
-        Label h3 = MakeLabel("播放/暂停", 26, 428);
-        txtPause = MakeText(120, 424, 240);
+        Controls.Add(RowLabel("播放/暂停", 30, 520));
+        txtPause = MakeText(150, 516, 300);
         Controls.Add(txtPause);
-
-        Label hkHint = new Label();
-        hkHint.Text = "格式示例：ctrl+alt+p、ctrl+shift+right、media_next";
-        hkHint.ForeColor = Color.FromArgb(140, 140, 150);
-        hkHint.Location = new Point(26, 500);
-        hkHint.AutoSize = false;
-        hkHint.Width = 460;
-        Controls.Add(hkHint);
 
         Button btnHkDefault = new Button();
         btnHkDefault.Text = "恢复默认";
-        btnHkDefault.Location = new Point(120, 462);
-        btnHkDefault.Width = 110;
+        btnHkDefault.Location = new Point(150, 552);
+        btnHkDefault.Size = new Size(110, 32);
         btnHkDefault.Click += delegate {
             txtNext.Text = "ctrl+alt+right";
             txtPrev.Text = "ctrl+alt+left";
@@ -171,61 +160,90 @@ public class AiSettingsForm : Form
         };
         Controls.Add(btnHkDefault);
 
+        Label hkHint = new Label();
+        hkHint.Text = "格式：ctrl+alt+p / ctrl+shift+right / media_next";
+        hkHint.ForeColor = Color.FromArgb(100, 120, 114);
+        hkHint.Location = new Point(30, 592);
+        hkHint.AutoSize = true;
+        Controls.Add(hkHint);
+
         Button btnBg = new Button();
-        btnBg.Text = "自定义背景…";
-        btnBg.Location = new Point(240, 462);
-        btnBg.Width = 120;
+        btnBg.Text = "自定义背景";
+        btnBg.Location = new Point(30, 620);
+        btnBg.Size = new Size(140, 34);
         btnBg.Click += delegate { using (var f = new BgForm()) f.ShowDialog(this); };
         Controls.Add(btnBg);
 
         Button btnMusic = new Button();
-        btnMusic.Text = "本地音乐…";
-        btnMusic.Location = new Point(370, 462);
-        btnMusic.Width = 120;
+        btnMusic.Text = "本地音乐";
+        btnMusic.Location = new Point(184, 620);
+        btnMusic.Size = new Size(140, 34);
         btnMusic.Click += delegate { using (var f = new MusicForm()) f.ShowDialog(this); };
         Controls.Add(btnMusic);
 
-        StyleUi(this);
-        StyleDark(this);
-        btnSave.BackColor = Color.FromArgb(58, 167, 154);
-        btnSave.ForeColor = Color.White;
+        btnSave = new Button();
+        btnSave.Text = "保存";
+        btnSave.Location = new Point(450, 664);
+        btnSave.Size = new Size(130, 38);
+        btnSave.Click += delegate { SaveAndClose(); };
+        Controls.Add(btnSave);
+
+        Button btnCancel = new Button();
+        btnCancel.Text = "取消";
+        btnCancel.Location = new Point(330, 664);
+        btnCancel.Size = new Size(100, 34);
+        btnCancel.Click += delegate { Close(); };
+        Controls.Add(btnCancel);
+
+        Label foot = new Label();
+        foot.Text = "Key 只保存在本机 bridge\\ai.ini";
+        foot.ForeColor = Color.FromArgb(88, 106, 100);
+        foot.Location = new Point(30, 700);
+        foot.AutoSize = true;
+        Controls.Add(foot);
+
+        // 窗口拖动
+        MouseEventHandler startDrag = delegate (object s, MouseEventArgs me) {
+            if (me.Button == MouseButtons.Left)
+            {
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, (IntPtr)0x2, IntPtr.Zero);
+            }
+        };
+        title.MouseDown += startDrag;
+        sub.MouseDown += startDrag;
+        this.MouseDown += startDrag;
+
+        StyleMinimal(this);
+        btnSave.BackColor = Color.FromArgb(127, 227, 212);
+        btnSave.ForeColor = Color.FromArgb(12, 26, 22);
         btnSave.FlatAppearance.BorderSize = 0;
+
         LoadIni();
     }
 
-
-    private static void StyleDark(Control root)
+    private static Label SectionTitle(string text, int x, int y)
     {
-        foreach (Control c in root.Controls)
-        {
-            Label l = c as Label;
-            if (l != null) l.ForeColor = Color.FromArgb(220, 235, 231);
-            CheckBox cb = c as CheckBox;
-            if (cb != null) cb.ForeColor = Color.FromArgb(220, 235, 231);
-            TextBox tb = c as TextBox;
-            if (tb != null)
-            {
-                tb.BackColor = Color.FromArgb(30, 46, 42);
-                tb.ForeColor = Color.FromArgb(236, 246, 243);
-            }
-            ComboBox cmb = c as ComboBox;
-            if (cmb != null)
-            {
-                cmb.BackColor = Color.FromArgb(30, 46, 42);
-                cmb.ForeColor = Color.FromArgb(236, 246, 243);
-            }
-            Button b = c as Button;
-            if (b != null)
-            {
-                b.BackColor = Color.FromArgb(38, 56, 51);
-                b.ForeColor = Color.FromArgb(230, 242, 238);
-                b.FlatAppearance.BorderColor = Color.FromArgb(72, 102, 94);
-            }
-            StyleDark(c);
-        }
+        Label l = new Label();
+        l.Text = text;
+        l.Font = new Font("Microsoft YaHei UI", 11f, FontStyle.Bold);
+        l.ForeColor = Color.FromArgb(206, 224, 218);
+        l.Location = new Point(x, y);
+        l.AutoSize = true;
+        return l;
     }
 
-    private static void StyleUi(Control root)
+    private static Label RowLabel(string text, int x, int y)
+    {
+        Label l = new Label();
+        l.Text = text;
+        l.ForeColor = Color.FromArgb(128, 150, 143);
+        l.Location = new Point(x, y);
+        l.AutoSize = true;
+        return l;
+    }
+
+    private static void StyleMinimal(Control root)
     {
         foreach (Control c in root.Controls)
         {
@@ -233,68 +251,30 @@ public class AiSettingsForm : Form
             if (b != null)
             {
                 b.FlatStyle = FlatStyle.Flat;
-                b.FlatAppearance.BorderColor = Color.FromArgb(214, 222, 222);
-                b.FlatAppearance.BorderSize = 1;
-                b.BackColor = Color.FromArgb(244, 247, 247);
-                b.ForeColor = Color.FromArgb(52, 64, 64);
-                if (b.Height < 30) b.Height = 30;
+                b.FlatAppearance.BorderSize = 0;
+                b.BackColor = Color.FromArgb(26, 32, 30);
+                b.ForeColor = Color.FromArgb(220, 234, 229);
+                if (b.Height < 32) b.Height = 32;
                 b.Cursor = Cursors.Hand;
             }
             TextBox tb = c as TextBox;
             if (tb != null)
             {
-                tb.BorderStyle = BorderStyle.FixedSingle;
+                tb.BorderStyle = BorderStyle.None;
+                tb.BackColor = Color.FromArgb(24, 30, 28);
+                tb.ForeColor = Color.FromArgb(236, 246, 242);
                 tb.Font = new Font("Microsoft YaHei UI", 10f);
-                tb.BackColor = Color.White;
             }
             ComboBox cb = c as ComboBox;
-            if (cb != null) cb.Font = new Font("Microsoft YaHei UI", 10f);
-            StyleUi(c);
+            if (cb != null)
+            {
+                cb.FlatStyle = FlatStyle.Flat;
+                cb.BackColor = Color.FromArgb(24, 30, 28);
+                cb.ForeColor = Color.FromArgb(236, 246, 242);
+                cb.Font = new Font("Microsoft YaHei UI", 10f);
+            }
+            StyleMinimal(c);
         }
-    }
-
-    protected override void OnResize(EventArgs e)
-    {
-        base.OnResize(e);
-        using (var path = RoundPath(new Rectangle(0, 0, Width, Height), 18))
-            Region = new Region(path);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        base.OnPaint(e);
-        using (var pen = new Pen(Color.FromArgb(70, 255, 255, 255), 1))
-        {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using (var path = RoundPath(new Rectangle(0, 0, Width - 1, Height - 1), 18))
-                e.Graphics.DrawPath(pen, path);
-        }
-        using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
-            new Rectangle(0, 0, Width, 90), Color.FromArgb(26, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90f))
-        {
-            e.Graphics.FillRectangle(brush, 0, 0, Width, 90);
-        }
-    }
-
-    internal static System.Drawing.Drawing2D.GraphicsPath RoundPath(Rectangle r, int radius)
-    {
-        var path = new System.Drawing.Drawing2D.GraphicsPath();
-        int d = radius * 2;
-        path.AddArc(r.X, r.Y, d, d, 180, 90);
-        path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-        path.CloseFigure();
-        return path;
-    }
-
-    protected override void OnHandleCreated(EventArgs e)
-    {
-        base.OnHandleCreated(e);
-        AcrylicHelper.Enable(this.Handle, 20, 34, 31, 150);
-        this.Opacity = 0.88;
-        this.DoubleBuffered = true;
-        this.BackColor = Color.FromArgb(24, 38, 35);
     }
 
     private Label MakeLabel(string text, int x, int y)
