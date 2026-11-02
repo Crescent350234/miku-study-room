@@ -1440,6 +1440,171 @@
       });
   }
 
+  /* ---------------- 歌单管理（内置模式） ---------------- */
+  var PL_KEY = 'mikuPlaylists.v1';
+  var plState = { list: [], active: 'meting' };
+
+  function loadPlState() {
+    try {
+      var s = JSON.parse(localStorage.getItem(PL_KEY) || 'null');
+      if (s && Array.isArray(s.list) && s.list.length) { plState = s; return; }
+    } catch (e) {}
+    plState = { list: [{ id: 'meting', name: 'STUDY WITH MIKU', type: 'meting' }], active: 'meting' };
+  }
+
+  function savePlState() {
+    try { localStorage.setItem(PL_KEY, JSON.stringify(plState)); } catch (e) {}
+  }
+
+  function plById(id) {
+    for (var i = 0; i < plState.list.length; i++) if (plState.list[i].id === id) return plState.list[i];
+    return null;
+  }
+
+  function idbOpen() {
+    return new Promise(function (res, rej) {
+      var r = indexedDB.open('mikuMusic', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('tracks'); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+  }
+
+  function idbPut(id, blob) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction('tracks', 'readwrite');
+        tx.objectStore('tracks').put(blob, id);
+        tx.oncomplete = function () { res(); };
+        tx.onerror = function () { rej(tx.error); };
+      });
+    });
+  }
+
+  function idbGet(id) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res, rej) {
+        var req = db.transaction('tracks', 'readonly').objectStore('tracks').get(id);
+        req.onsuccess = function () { res(req.result); };
+        req.onerror = function () { rej(req.error); };
+      });
+    });
+  }
+
+  function refreshPlaylistBar() {
+    var sel = $('plSelect');
+    if (!sel) return;
+    sel.innerHTML = plState.list.map(function (p) {
+      return '<option value="' + esc(p.id) + '"' + (p.id === plState.active ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+    }).join('');
+  }
+
+  function activatePlaylist(id, autoplay) {
+    var p = plById(id);
+    if (!p) return;
+    plState.active = id;
+    savePlState();
+    refreshPlaylistBar();
+
+    if (p.type === 'meting') {
+      loadPlaylistConfig().then(fetchPlaylist).then(function (songs) {
+        S.songs = songs;
+        S.index = 0;
+        renderPlaylist();
+        if (songs.length) selectSong(0, autoplay !== false);
+      }).catch(function () {});
+      return;
+    }
+
+    S.songs = (p.songs || []).slice();
+    S.index = 0;
+    renderPlaylist();
+    if (S.songs.length) selectSong(0, autoplay !== false);
+    else el.empty.textContent = '这个歌单还没有歌，点「导入音乐」添加';
+  }
+
+  function initPlaylistUI() {
+    loadPlState();
+    refreshPlaylistBar();
+
+    var sel = $('plSelect');
+    if (sel) sel.addEventListener('change', function () { activatePlaylist(sel.value, true); });
+
+    var file = $('plFile');
+    var importBtn = $('plImport');
+    if (importBtn && file) importBtn.addEventListener('click', function () { file.click(); });
+
+    if (file) file.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(file.files || []);
+      file.value = '';
+      if (!files.length) return;
+
+      var p = plById(plState.active);
+      if (!p || p.type === 'meting') {
+        p = { id: 'pl' + Date.now(), name: '我的歌单', songs: [] };
+        plState.list.push(p);
+        plState.active = p.id;
+        savePlState();
+      }
+      if (!p.songs) p.songs = [];
+
+      toast('正在导入 ' + files.length + ' 首…');
+      var chain = Promise.resolve();
+      files.forEach(function (f, idx) {
+        chain = chain.then(function () {
+          var tid = 't' + Date.now() + '_' + idx;
+          return idbPut(tid, f).then(function () {
+            p.songs.push({
+              name: f.name.replace(/\.[^.]+$/, ''),
+              artist: '本地导入',
+              url: 'idb:' + tid,
+              local: true
+            });
+          });
+        });
+      });
+
+      chain.then(function () {
+        savePlState();
+        refreshPlaylistBar();
+        S.songs = p.songs.slice();
+        S.index = 0;
+        renderPlaylist();
+        el.drawerTitle.textContent = p.name;
+        selectSong(0, true);
+        toast('已导入 ' + files.length + ' 首到「' + p.name + '」');
+      }).catch(function () { toast('导入失败'); });
+    });
+
+    var newBtn = $('plNew');
+    if (newBtn) newBtn.addEventListener('click', function () {
+      var name = window.prompt('新歌单名称', '我的歌单');
+      if (!name) return;
+      var p = { id: 'pl' + Date.now(), name: name.slice(0, 40), songs: [] };
+      plState.list.push(p);
+      plState.active = p.id;
+      savePlState();
+      refreshPlaylistBar();
+      S.songs = [];
+      renderPlaylist();
+      toast('已新建歌单「' + p.name + '」');
+    });
+
+    var delBtn = $('plDel');
+    if (delBtn) delBtn.addEventListener('click', function () {
+      var p = plById(plState.active);
+      if (!p) return;
+      if (p.type === 'meting') { toast('默认歌单不能删除'); return; }
+      if (!window.confirm('删除歌单「' + p.name + '」？')) return;
+      plState.list = plState.list.filter(function (x) { return x.id !== p.id; });
+      plState.active = 'meting';
+      savePlState();
+      refreshPlaylistBar();
+      activatePlaylist('meting', false);
+      toast('已删除「' + p.name + '」');
+    });
+  }
+
   function currentList() {
     return (S.mode === 'mirror' && queue.list.length) ? queue.list : S.songs;
   }
@@ -1520,8 +1685,9 @@
         ? '同步自网易云 · ' + queue.list.length + ' 首'
         : '等待控制桥同步…';
     } else {
-      el.drawerTitle.textContent = 'STUDY WITH MIKU · 歌单';
-      el.drawerFoot.textContent = '来自网易云 · ' + S.songs.length + ' 首';
+      var ap = plById(plState.active) || { name: 'STUDY WITH MIKU', type: 'meting' };
+      el.drawerTitle.textContent = ap.name;
+      el.drawerFoot.textContent = (ap.type === 'meting' ? '来自网易云 · ' : '本地歌单 · ') + S.songs.length + ' 首';
     }
   }
 
@@ -1654,20 +1820,31 @@
       }
     }
 
-    el.audio.src = song.url;
-    if (S.mode !== 'mirror') {
-      S.position = 0;
-      S.duration = 0;
-      el.fill.style.width = '0%';
-      el.pos.textContent = '0:00';
-      el.dur.textContent = '0:00';
+    var startPlayback = function (url) {
+      el.audio.src = url;
+      if (S.mode !== 'mirror') {
+        S.position = 0;
+        S.duration = 0;
+        el.fill.style.width = '0%';
+        el.pos.textContent = '0:00';
+        el.dur.textContent = '0:00';
+      }
+
+      renderPlaylist();
+      if (S.mode !== 'mirror') loadLyrics(song.lrc, song.name);
+
+      if (autoplay !== false) playAudio();
+      scrollActiveIntoView();
+    };
+
+    if (String(song.url || '').indexOf('idb:') === 0) {
+      idbGet(song.url.slice(4)).then(function (blob) {
+        if (!blob) { toast('本地音乐文件丢失，请重新导入'); return; }
+        startPlayback(URL.createObjectURL(blob));
+      }).catch(function () { toast('读取本地音乐失败'); });
+    } else {
+      startPlayback(song.url);
     }
-
-    renderPlaylist();
-    if (S.mode !== 'mirror') loadLyrics(song.lrc, song.name);
-
-    if (autoplay !== false) playAudio();
-    scrollActiveIntoView();
   }
 
   function scrollActiveIntoView() {
@@ -2858,6 +3035,7 @@
     renderSceneChips();
     renderPickers();
     initOverlayControls();
+    initPlaylistUI();
     if (el.aiSave) el.aiSave.addEventListener('click', saveAiSettings);
     if (el.aiEnabled) el.aiEnabled.addEventListener('change', saveAiSettings);
     setInterval(pollQueue, 2500);
@@ -2870,7 +3048,7 @@
       return;
     }
 
-    registerMedia();
+    try { registerMedia(); } catch (e) {}
 
     loadPlaylistConfig()
       .then(function () {
@@ -2885,6 +3063,7 @@
         el.drawerFoot.textContent = '来自网易云 · ' + songs.length + ' 首';
         selectSong(0, false);
         // 不自动播放：默认安静，用户点播放器 ▶ 才出声
+        if (plState.active && plState.active !== 'meting') activatePlaylist(plState.active, false);
       })
       .catch(function () {
         el.title.textContent = '歌单加载失败';

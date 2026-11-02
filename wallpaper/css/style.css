@@ -4072,3 +4072,36 @@ body.focus-on .drawer {
   padding: calc(7 * var(--s)) calc(16 * var(--s));
   font-size: calc(13 * var(--s));
 }
+
+.pl-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(8 * var(--s));
+  padding: calc(10 * var(--s)) calc(18 * var(--s)) calc(6 * var(--s));
+}
+
+.pl-tools select {
+  flex: 1;
+  min-width: calc(130 * var(--s));
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: calc(8 * var(--s));
+  padding: calc(6 * var(--s)) calc(9 * var(--s));
+  font-size: calc(12 * var(--s));
+}
+
+.pl-tools button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-radius: 999px;
+  padding: calc(5 * var(--s)) calc(12 * var(--s));
+  font-size: calc(12 * var(--s));
+  cursor: pointer;
+}
+
+.pl-tools button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}

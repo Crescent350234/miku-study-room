@@ -164,6 +164,13 @@
       <span id="drawerTitle">STUDY WITH MIKU · 歌单</span>
       <button class="close" id="closeDrawer" aria-label="关闭">×</button>
     </div>
+    <div class="pl-tools">
+      <select id="plSelect" aria-label="选择歌单"></select>
+      <button id="plNew">新建</button>
+      <button id="plImport">导入音乐</button>
+      <button id="plDel">删除</button>
+      <input type="file" id="plFile" accept="audio/*" multiple hidden>
+    </div>
     <div class="scroll-pager">
       <button id="pageUp" aria-label="上翻">▲ 上翻</button>
       <button id="pageDown" aria-label="下翻">▼ 下翻</button>
@@ -177,7 +184,7 @@
 
   <audio id="audio" preload="auto"></audio>
 
-  <script src="js/app.js?v=251"></script>
+  <script src="js/app.js?v=254"></script>
   <div class="onboard-mask" id="onboardMask">
     <div class="onboard">
       <div class="onboard-title">开始使用 Miku Study Room</div>
