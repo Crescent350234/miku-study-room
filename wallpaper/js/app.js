@@ -1295,7 +1295,15 @@
     for (var i = 0; i < S.lrc.length; i++) {
       if (S.lrc[i].t <= t + 0.15) idx = i; else break;
     }
+
+    var prevTime = S.lastLyricTime || 0;
+    S.lastLyricTime = time;
+
     if (idx === S.lrcIndex) return;
+
+    // 进度抖动时不要退回上一句；只有明显回退（拖进度条/重播）才允许
+    if (S.mode === 'mirror' && S.lrcIndex >= 0 && idx < S.lrcIndex && time >= prevTime - 1.5) return;
+
     S.lrcIndex = idx;
     pushLyricNow();
 
@@ -1347,6 +1355,7 @@
   function loadLyrics(url, title) {
     var token = ++S.lyricToken;
     S.lrc = [];
+    S.lastLyricTime = 0;
 
     if (!url) {
       renderLyrics([]);
