@@ -132,6 +132,9 @@ internal static class Bridge
 
 
     private static string _acao = "null";
+    private static string _lyricsText = "";
+    private static double _lyricsPos = 0;
+    private static DateTime _lyricsAt = DateTime.MinValue;
 
     private static string Esc(string s)
     {
@@ -979,7 +982,26 @@ internal static class Bridge
                             try { Process.Start(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AiSettings.exe")); } catch { }
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
                         }
-                                                                        else if (path.StartsWith("/ui.prefs"))
+                                                                                                else if (path.StartsWith("/lyrics.push"))
+                        {
+                            int qm2 = rawPath.IndexOf('?');
+                            string qs2 = qm2 >= 0 ? rawPath.Substring(qm2) : "";
+                            string txt = QueryValue(qs2, "text");
+                            string ps = QueryValue(qs2, "pos");
+                            _lyricsText = Uri.UnescapeDataString(txt ?? "");
+                            double pv;
+                            if (double.TryParse(ps, out pv)) _lyricsPos = pv;
+                            _lyricsAt = DateTime.UtcNow;
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
+                        }
+                        else if (path.StartsWith("/lyrics.json"))
+                        {
+                            double age = (DateTime.UtcNow - _lyricsAt).TotalMilliseconds;
+                            string txt = age < 4000 ? _lyricsText : "";
+                            Send(stream, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"text\":\"" + Esc(txt) + "\",\"pos\":" + _lyricsPos.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"age\":" + (long)age + "}"));
+                        }
+                        else if (path.StartsWith("/ui.prefs"))
                         {
                             int qm = rawPath.IndexOf('?');
                             string f = QueryValue(qm >= 0 ? rawPath.Substring(qm) : "", "font");

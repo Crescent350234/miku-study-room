@@ -2573,6 +2573,20 @@
 
   function start() {
     discoverBridgePort();
+
+    setInterval(function () {
+      if (!BRIDGE || !S.lrc.length) return;
+      var i = S.lrcIndex;
+      var txt = (i >= 0 && S.lrc[i]) ? (S.lrc[i].text || '') : '';
+      var p = (S.position || 0).toFixed(2);
+      fetch(BRIDGE + 'lyrics.push?pos=' + p + '&text=' + encodeURIComponent(txt), { cache: 'no-store' }).catch(function () {});
+    }, 600);
+
+    setInterval(function () {
+      if (!BRIDGE || !S.lyricFont) return;
+      fetch(BRIDGE + 'ui.prefs?font=' + encodeURIComponent(S.lyricFont), { cache: 'no-store' }).catch(function () {});
+    }, 2000);
+
     var cleanBtn = $('cleanBtn');
 
     var focusBtn = $('focusBtn');

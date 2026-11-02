@@ -31,6 +31,10 @@ public class OverlayWindow : Window
     private double indexChangedAt = 0;
     private string fontId = "sans";
     private string currentText = "";
+    private string pushText = "";
+    private DateTime pushAt = DateTime.MinValue;
+    private DateTime pushTextAt = DateTime.MinValue;
+    private DispatcherTimer pushTimer;
 
     private class CharAnim
     {
@@ -124,8 +128,13 @@ public class OverlayWindow : Window
 
         stateTimer = new DispatcherTimer();
         stateTimer.Interval = TimeSpan.FromMilliseconds(500);
-        stateTimer.Tick += delegate { LoadState(); };
+        stateTimer.Tick += delegate { LoadState(); LoadUiFont(); };
         stateTimer.Start();
+
+        pushTimer = new DispatcherTimer();
+        pushTimer.Interval = TimeSpan.FromMilliseconds(250);
+        pushTimer.Tick += delegate { FetchPush(); };
+        pushTimer.Start();
 
         RefreshData();
     }
@@ -275,6 +284,20 @@ public class OverlayWindow : Window
     {
         if (!visibleWanted) return;
 
+        double pushAge = (DateTime.Now - pushAt).TotalSeconds;
+        if (pushAge < 3.0)
+        {
+            if (currentText != pushText)
+            {
+                SetScatter(pushText);
+                pushTextAt = DateTime.Now;
+            }
+            double f = Math.Min(1.0, (DateTime.Now - pushTextAt).TotalSeconds / 0.35);
+            currentPanel.Opacity = f;
+            AnimateChars();
+            return;
+        }
+
         double posSec = (DateTime.Now - songStarted).TotalSeconds;
 
         int idx = -1;
@@ -303,6 +326,11 @@ public class OverlayWindow : Window
         fade = Math.Min(1.0, age / 0.35);
         currentPanel.Opacity = fade;
 
+        AnimateChars();
+    }
+
+    private void AnimateChars()
+    {
         double t = DateTime.Now.TimeOfDay.TotalSeconds;
         for (int i = 0; i < anims.Count; i++)
         {
@@ -310,6 +338,30 @@ public class OverlayWindow : Window
             double ph = t * a.Speed + a.Phase;
             a.Tf.X = a.BaseX + Math.Sin(ph) * a.Ax;
             a.Tf.Y = a.BaseY + Math.Cos(ph * 1.13) * a.Ay;
+        }
+    }
+
+    private void FetchPush()
+    {
+        if (!visibleWanted) return;
+        string j = Get("lyrics.json", 700);
+        if (string.IsNullOrEmpty(j)) return;
+        long ageMs = NumField(j, "age");
+        if (ageMs > 3000) return;
+
+        string txt = Field(j, "text");
+        pushAt = DateTime.Now;
+        if (txt != pushText)
+        {
+            pushText = txt;
+            pushTextAt = DateTime.Now;
+            try
+            {
+                File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    @"MikuWallpaper\lyrics-overlay-push.log"),
+                    DateTime.Now.ToString("HH:mm:ss") + " " + txt, new UTF8Encoding(false));
+            }
+            catch { }
         }
     }
 
@@ -443,6 +495,18 @@ public class OverlayWindow : Window
                 " idx=" + idx + " lines=" + text, new UTF8Encoding(false));
         }
         catch { }
+    }
+
+    private static long NumField(string json, string key)
+    {
+        string pat = "\"" + key + "\":";
+        int i = json.IndexOf(pat, StringComparison.Ordinal);
+        if (i < 0) return -1;
+        i += pat.Length;
+        int start = i;
+        while (i < json.Length && (char.IsDigit(json[i]) || json[i] == '-')) i++;
+        long v;
+        return long.TryParse(json.Substring(start, i - start), out v) ? v : -1;
     }
 
     private static string Field(string json, string key)
