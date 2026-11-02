@@ -788,6 +788,34 @@ internal static class Bridge
         return "{\"on\":false,\"pos\":\"top\"}";
     }
 
+    private static void SetOverlayPrefs(double? alpha, double? scale, string pos)
+    {
+        try
+        {
+            string p = OverlayStatePath();
+            bool on = false;
+            string curPos = "top";
+            double a = 1.0;
+            double s = 1.0;
+            if (File.Exists(p))
+            {
+                string cur = File.ReadAllText(p);
+                on = cur.IndexOf("\"on\":true", StringComparison.Ordinal) >= 0;
+                curPos = cur.IndexOf("\"pos\":\"bottom\"", StringComparison.Ordinal) >= 0 ? "bottom" : "top";
+                a = JNum(cur, "alpha", 1.0);
+                s = JNum(cur, "scale", 1.0);
+            }
+            if (alpha.HasValue) a = Math.Max(0.2, Math.Min(1.0, alpha.Value));
+            if (scale.HasValue) s = Math.Max(0.6, Math.Min(1.8, scale.Value));
+            if (!string.IsNullOrEmpty(pos)) curPos = pos == "bottom" ? "bottom" : "top";
+            Directory.CreateDirectory(Path.GetDirectoryName(p));
+            File.WriteAllText(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + curPos +
+                "\",\"alpha\":" + a.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ",\"scale\":" + s.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", new UTF8Encoding(false));
+        }
+        catch { }
+    }
+
     private static bool OverlayToggle()
     {
         bool on = false;
@@ -1062,6 +1090,17 @@ internal static class Bridge
                         }
                         else if (path.StartsWith("/overlay.json"))
                         {
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(OverlayJson()));
+                        }
+                        else if (path.StartsWith("/overlay.prefs"))
+                        {
+                            int qm3 = rawPath.IndexOf('?');
+                            string qs3 = qm3 >= 0 ? rawPath.Substring(qm3) : "";
+                            double a3, s3;
+                            bool hasA = double.TryParse(QueryValue(qs3, "alpha"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out a3);
+                            bool hasS = double.TryParse(QueryValue(qs3, "scale"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out s3);
+                            string p3 = QueryValue(qs3, "pos");
+                            SetOverlayPrefs(hasA ? (double?)a3 : null, hasS ? (double?)s3 : null, p3);
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(OverlayJson()));
                         }
                         else if (path.StartsWith("/overlay.toggle"))

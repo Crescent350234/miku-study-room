@@ -4028,3 +4028,11 @@ body.focus-on .settings,
 body.focus-on .drawer {
   display: none !important;
 }
+
+:root {
+  --lyric-scale: 1;
+}
+
+.lyrics-area {
+  --s: calc(min(0.0390625vw, 0.069444vh) * var(--lyric-scale));
+}

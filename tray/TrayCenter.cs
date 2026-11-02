@@ -17,6 +17,12 @@ public class TrayApp : ApplicationContext
     private ToolStripMenuItem playItem;
     private ToolStripMenuItem focusItem;
     private ToolStripMenuItem overlayItem;
+    private ToolStripMenuItem[] alphaItems = new ToolStripMenuItem[5];
+    private ToolStripMenuItem[] sizeItems = new ToolStripMenuItem[4];
+    private static readonly double[] AlphaVals = { 1.0, 0.85, 0.7, 0.55, 0.4 };
+    private static readonly string[] AlphaLabels = { "100%", "85%", "70%", "55%", "40%" };
+    private static readonly double[] SizeVals = { 0.8, 1.0, 1.25, 1.5 };
+    private static readonly string[] SizeLabels = { "小", "标准", "大", "特大" };
     private System.Windows.Forms.Timer timer;
     private string baseUrl = "http://127.0.0.1:51789/";
     private bool focusOn = false;
@@ -61,28 +67,27 @@ public class TrayApp : ApplicationContext
         menu.Items.Add(posMenu);
 
         var alphaMenu = new ToolStripMenuItem("歌词透明度");
-        foreach (var opt in new object[][] {
-            new object[] { "100%", 1.0 }, new object[] { "85%", 0.85 }, new object[] { "70%", 0.7 },
-            new object[] { "55%", 0.55 }, new object[] { "40%", 0.4 } })
+        for (int i = 0; i < AlphaVals.Length; i++)
         {
-            double v = (double)opt[1];
-            var it = new ToolStripMenuItem((string)opt[0]);
+            double v = AlphaVals[i];
+            var it = new ToolStripMenuItem(AlphaLabels[i]);
             it.Click += delegate { SetOverlayAlpha(v); };
             alphaMenu.DropDownItems.Add(it);
+            alphaItems[i] = it;
         }
         menu.Items.Add(alphaMenu);
 
         var sizeMenu = new ToolStripMenuItem("歌词字号");
-        foreach (var opt in new object[][] {
-            new object[] { "小", 0.8 }, new object[] { "标准", 1.0 },
-            new object[] { "大", 1.25 }, new object[] { "特大", 1.5 } })
+        for (int i = 0; i < SizeVals.Length; i++)
         {
-            double v = (double)opt[1];
-            var it = new ToolStripMenuItem((string)opt[0]);
+            double v = SizeVals[i];
+            var it = new ToolStripMenuItem(SizeLabels[i]);
             it.Click += delegate { SetOverlayScale(v); };
             sizeMenu.DropDownItems.Add(it);
+            sizeItems[i] = it;
         }
         menu.Items.Add(sizeMenu);
+        menu.Opening += delegate { SyncOverlayChecks(); };
 
         menu.Items.Add(new ToolStripMenuItem("重启桥接", null, delegate { RestartBridge(); }));
         menu.Items.Add(new ToolStripMenuItem("打开设置", null, delegate { OpenSettings(); }));
@@ -370,6 +375,16 @@ public class TrayApp : ApplicationContext
     private void SetOverlayScale(double scale)
     {
         WriteOverlayState(OverlayOn(), OverlayPos(), OverlayNum("alpha", 1.0), scale);
+    }
+
+    private void SyncOverlayChecks()
+    {
+        double a = OverlayNum("alpha", 1.0);
+        double s = OverlayNum("scale", 1.0);
+        for (int i = 0; i < alphaItems.Length; i++)
+            if (alphaItems[i] != null) alphaItems[i].Checked = Math.Abs(AlphaVals[i] - a) < 0.01;
+        for (int i = 0; i < sizeItems.Length; i++)
+            if (sizeItems[i] != null) sizeItems[i].Checked = Math.Abs(SizeVals[i] - s) < 0.01;
     }
 
     private static void EnsureOverlay()

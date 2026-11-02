@@ -2623,6 +2623,73 @@
     next();
   }
 
+  var OVERLAY_ALPHA_OPTS = [{ v: 1, label: '100%' }, { v: 0.85, label: '85%' }, { v: 0.7, label: '70%' }, { v: 0.55, label: '55%' }, { v: 0.4, label: '40%' }];
+  var OVERLAY_SIZE_OPTS = [{ v: 0.8, label: '小' }, { v: 1, label: '标准' }, { v: 1.25, label: '大' }, { v: 1.5, label: '特大' }];
+  var LYRIC_SIZE_OPTS = [{ v: 0.85, label: '小' }, { v: 1, label: '标准' }, { v: 1.2, label: '大' }, { v: 1.4, label: '特大' }];
+
+  function initOverlayControls() {
+    var aHost = $('overlayAlphaChips');
+    var sHost = $('overlaySizeChips');
+    var lHost = $('lyricScaleChips');
+    if (!aHost && !sHost && !lHost) return;
+
+    var prefs = { alpha: 1, scale: 1 };
+    var lyricScale = 1;
+    try { lyricScale = parseFloat(localStorage.getItem('lyricScale')) || 1; } catch (e) {}
+
+    function fill(host, opts, current, cb) {
+      if (!host) return;
+      host.innerHTML = '';
+      opts.forEach(function (o) {
+        var b = document.createElement('button');
+        b.className = 'style-chip' + (Math.abs(o.v - current) < 0.001 ? ' on' : '');
+        b.textContent = o.label;
+        b.addEventListener('click', function () { cb(o.v); });
+        host.appendChild(b);
+      });
+    }
+
+    function render() {
+      fill(aHost, OVERLAY_ALPHA_OPTS, prefs.alpha, function (v) { setPref('alpha', v); });
+      fill(sHost, OVERLAY_SIZE_OPTS, prefs.scale, function (v) { setPref('scale', v); });
+      fill(lHost, LYRIC_SIZE_OPTS, lyricScale, function (v) {
+        lyricScale = v;
+        document.documentElement.style.setProperty('--lyric-scale', v);
+        try { localStorage.setItem('lyricScale', v); } catch (e) {}
+        render();
+      });
+    }
+
+    function loadPrefs() {
+      if (!BRIDGE) return;
+      fetch(BRIDGE + 'overlay.json', { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          prefs.alpha = parseFloat(d.alpha) || 1;
+          prefs.scale = parseFloat(d.scale) || 1;
+          render();
+        })
+        .catch(function () {});
+    }
+
+    function setPref(key, val) {
+      if (!BRIDGE) { toast('桥接未运行'); return; }
+      fetch(BRIDGE + 'overlay.prefs?' + key + '=' + val, { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          prefs.alpha = parseFloat(d.alpha) || prefs.alpha;
+          prefs.scale = parseFloat(d.scale) || prefs.scale;
+          render();
+        })
+        .catch(function () {});
+    }
+
+    document.documentElement.style.setProperty('--lyric-scale', lyricScale);
+    render();
+    loadPrefs();
+    setInterval(loadPrefs, 4000);
+  }
+
   function start() {
     discoverBridgePort();
 
@@ -2790,6 +2857,7 @@
     renderStyleChips();
     renderSceneChips();
     renderPickers();
+    initOverlayControls();
     if (el.aiSave) el.aiSave.addEventListener('click', saveAiSettings);
     if (el.aiEnabled) el.aiEnabled.addEventListener('change', saveAiSettings);
     setInterval(pollQueue, 2500);
