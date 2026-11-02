@@ -26,10 +26,11 @@ public class OverlayWindow : Window
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
     private StackPanel currentPanel;
-    private TextBlock next;
     private double fade = 0;
     private int shownIndex = -1;
     private double indexChangedAt = 0;
+    private string fontId = "sans";
+    private string currentText = "";
 
     private class CharAnim
     {
@@ -98,17 +99,7 @@ public class OverlayWindow : Window
         currentPanel.IsHitTestVisible = false;
         currentPanel.Opacity = 0;
 
-        next = new TextBlock();
-        next.FontFamily = new FontFamily("Microsoft YaHei UI");
-        next.FontSize = 21;
-        next.FontWeight = FontWeights.Light;
-        next.Foreground = new SolidColorBrush(Color.FromArgb(150, 210, 228, 222));
-        next.TextAlignment = TextAlignment.Center;
-        next.Margin = new Thickness(0, 10, 0, 0);
-        next.Opacity = 0.0;
-
         stack.Children.Add(currentPanel);
-        stack.Children.Add(next);
         root.Children.Add(stack);
         Content = root;
 
@@ -208,6 +199,7 @@ public class OverlayWindow : Window
     private void RefreshData()
     {
         if (!visibleWanted) return;
+        LoadUiFont();
 
         string json = Get("now.json", 1200);
         if (string.IsNullOrEmpty(json)) return;
@@ -299,12 +291,10 @@ public class OverlayWindow : Window
             if (idx >= 0 && idx < lines.Count)
             {
                 SetScatter(lines[idx].Text);
-                next.Text = (idx + 1 < lines.Count) ? lines[idx + 1].Text : "";
             }
             else
             {
                 SetScatter("");
-                next.Text = "";
             }
             DebugLog(posSec, idx, idx >= 0 && idx < lines.Count ? lines[idx].Text : "");
         }
@@ -312,7 +302,6 @@ public class OverlayWindow : Window
         double age = posSec - indexChangedAt;
         fade = Math.Min(1.0, age / 0.35);
         currentPanel.Opacity = fade;
-        next.Opacity = fade * 0.55;
 
         double t = DateTime.Now.TimeOfDay.TotalSeconds;
         for (int i = 0; i < anims.Count; i++)
@@ -324,10 +313,47 @@ public class OverlayWindow : Window
         }
     }
 
+    private class FontPick
+    {
+        public FontFamily Family;
+        public FontWeight Weight;
+        public FontPick(FontFamily f, FontWeight w) { Family = f; Weight = w; }
+    }
+
+    private static FontPick FontFor(string id)
+    {
+        switch (id)
+        {
+            case "kai": return new FontPick(new FontFamily("KaiTi"), FontWeights.Normal);
+            case "serif": return new FontPick(new FontFamily("SimSun"), FontWeights.Normal);
+            case "fangsong": return new FontPick(new FontFamily("FangSong"), FontWeights.Normal);
+            case "dengxian": return new FontPick(new FontFamily("DengXian"), FontWeights.Normal);
+            case "youyuan": return new FontPick(new FontFamily("YouYuan"), FontWeights.Normal);
+            case "mono": return new FontPick(new FontFamily("Consolas"), FontWeights.Normal);
+            case "lishu": return new FontPick(new FontFamily("LiSu"), FontWeights.Normal);
+            case "light": return new FontPick(new FontFamily("DengXian Light"), FontWeights.Light);
+            case "hei": return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Bold);
+            default: return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Light);
+        }
+    }
+
+    private void LoadUiFont()
+    {
+        string j = Get("ui.json", 1200);
+        if (string.IsNullOrEmpty(j)) return;
+        string f = Field(j, "font");
+        if (!string.IsNullOrEmpty(f) && f != fontId)
+        {
+            fontId = f;
+            if (!string.IsNullOrEmpty(currentText)) SetScatter(currentText);
+        }
+    }
+
     private void SetScatter(string text)
     {
         currentPanel.Children.Clear();
         anims.Clear();
+        currentText = text;
         if (string.IsNullOrEmpty(text)) return;
 
         var units = new List<string>();
@@ -345,6 +371,14 @@ public class OverlayWindow : Window
         int seed = text.GetHashCode();
         double baseSize = units.Count > 16 ? 28 : (units.Count > 11 ? 32 : 38);
 
+        try
+        {
+            File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                @"MikuWallpaper\lyrics-overlay-font.log"),
+                DateTime.Now.ToString("HH:mm:ss") + " font=" + fontId + " units=" + units.Count, new UTF8Encoding(false));
+        }
+        catch { }
+
         for (int i = 0; i < units.Count; i++)
         {
             double r = Frac(Math.Sin(seed + i * 13) * 10000);
@@ -353,9 +387,11 @@ public class OverlayWindow : Window
 
             var tb = new TextBlock();
             tb.Text = units[i];
-            tb.FontFamily = new FontFamily("Microsoft YaHei UI");
+            var fp = FontFor(fontId);
+            tb.FontFamily = fp.Family;
             tb.FontSize = baseSize * (0.9 + r * 0.6);
-            tb.FontWeight = FontWeights.Light;
+            tb.FontWeight = fp.Weight;
+            tb.Margin = new Thickness(0, 0, baseSize * 0.28, 0);
             tb.Foreground = new SolidColorBrush(Color.FromRgb(246, 252, 250));
             tb.Effect = new DropShadowEffect
             {

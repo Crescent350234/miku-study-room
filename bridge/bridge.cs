@@ -711,6 +711,55 @@ internal static class Bridge
 
 
 
+
+    private static string UiStatePath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            @"MikuWallpaper\ui.json");
+    }
+
+    private static string _uiFont;
+
+    private static string GetUiFont()
+    {
+        if (!string.IsNullOrEmpty(_uiFont)) return _uiFont;
+        try
+        {
+            string p = UiStatePath();
+            if (File.Exists(p))
+            {
+                string s = File.ReadAllText(p);
+                int i = s.IndexOf("\"font\":\"", StringComparison.Ordinal);
+                if (i >= 0)
+                {
+                    i += 8;
+                    int j = s.IndexOf('"', i);
+                    if (j > i) _uiFont = s.Substring(i, j - i);
+                }
+            }
+        }
+        catch { }
+        if (string.IsNullOrEmpty(_uiFont)) _uiFont = "sans";
+        return _uiFont;
+    }
+
+    private static void SaveUiFont(string font)
+    {
+        try
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (char ch in font.ToLowerInvariant())
+                if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) sb.Append(ch);
+            string v = sb.ToString();
+            if (v.Length == 0) return;
+            _uiFont = v;
+            string p = UiStatePath();
+            Directory.CreateDirectory(Path.GetDirectoryName(p));
+            File.WriteAllText(p, "{\"font\":\"" + v + "\"}", new UTF8Encoding(false));
+        }
+        catch { }
+    }
+
     private static string OverlayStatePath()
     {
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -930,7 +979,18 @@ internal static class Bridge
                             try { Process.Start(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AiSettings.exe")); } catch { }
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
                         }
-                                                else if (path.StartsWith("/overlay.json"))
+                                                                        else if (path.StartsWith("/ui.prefs"))
+                        {
+                            int qm = rawPath.IndexOf('?');
+                            string f = QueryValue(qm >= 0 ? rawPath.Substring(qm) : "", "font");
+                            if (!string.IsNullOrEmpty(f)) SaveUiFont(f);
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"font\":\"" + Esc(GetUiFont()) + "\"}"));
+                        }
+                        else if (path.StartsWith("/ui.json"))
+                        {
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"font\":\"" + Esc(GetUiFont()) + "\"}"));
+                        }
+                        else if (path.StartsWith("/overlay.json"))
                         {
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(OverlayJson()));
                         }

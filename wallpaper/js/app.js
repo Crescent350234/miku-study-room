@@ -2427,6 +2427,9 @@
     document.body.className = document.body.className.split(/\s+/).filter(function (c) { return c.indexOf('font-') !== 0; }).join(' ') + ' font-' + id;
     try { localStorage.setItem('lyricFont', id); } catch (e) {}
     S.lyricFont = id;
+    try {
+      if (BRIDGE) fetch(BRIDGE + 'ui.prefs?font=' + encodeURIComponent(id), { cache: 'no-store' }).catch(function () {});
+    } catch (e) {}
   }
 
   function cycleLyricFont() {
