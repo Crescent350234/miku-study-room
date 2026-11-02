@@ -60,6 +60,30 @@ public class TrayApp : ApplicationContext
         posMenu.DropDownItems.Add(posBottom);
         menu.Items.Add(posMenu);
 
+        var alphaMenu = new ToolStripMenuItem("歌词透明度");
+        foreach (var opt in new object[][] {
+            new object[] { "100%", 1.0 }, new object[] { "85%", 0.85 }, new object[] { "70%", 0.7 },
+            new object[] { "55%", 0.55 }, new object[] { "40%", 0.4 } })
+        {
+            double v = (double)opt[1];
+            var it = new ToolStripMenuItem((string)opt[0]);
+            it.Click += delegate { SetOverlayAlpha(v); };
+            alphaMenu.DropDownItems.Add(it);
+        }
+        menu.Items.Add(alphaMenu);
+
+        var sizeMenu = new ToolStripMenuItem("歌词字号");
+        foreach (var opt in new object[][] {
+            new object[] { "小", 0.8 }, new object[] { "标准", 1.0 },
+            new object[] { "大", 1.25 }, new object[] { "特大", 1.5 } })
+        {
+            double v = (double)opt[1];
+            var it = new ToolStripMenuItem((string)opt[0]);
+            it.Click += delegate { SetOverlayScale(v); };
+            sizeMenu.DropDownItems.Add(it);
+        }
+        menu.Items.Add(sizeMenu);
+
         menu.Items.Add(new ToolStripMenuItem("重启桥接", null, delegate { RestartBridge(); }));
         menu.Items.Add(new ToolStripMenuItem("打开设置", null, delegate { OpenSettings(); }));
         menu.Items.Add(new ToolStripMenuItem("打开壁纸目录", null, delegate { OpenWallpaperDir(); }));
@@ -301,15 +325,51 @@ public class TrayApp : ApplicationContext
         catch { return "top"; }
     }
 
-    private static void WriteOverlayState(bool on, string pos)
+    private static double OverlayNum(string key, double def)
+    {
+        try
+        {
+            if (!File.Exists(OverlayStatePath())) return def;
+            string s = File.ReadAllText(OverlayStatePath());
+            string pat = "\"" + key + "\":";
+            int i = s.IndexOf(pat, StringComparison.Ordinal);
+            if (i < 0) return def;
+            i += pat.Length;
+            int st = i;
+            while (i < s.Length && (char.IsDigit(s[i]) || s[i] == '.' || s[i] == '-')) i++;
+            double v;
+            return double.TryParse(s.Substring(st, i - st), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out v) ? v : def;
+        }
+        catch { return def; }
+    }
+
+    private static void WriteOverlayState(bool on, string pos, double alpha, double scale)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(OverlayStatePath()));
             File.WriteAllText(OverlayStatePath(),
-                "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos + "\"}", new UTF8Encoding(false));
+                "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos +
+                "\",\"alpha\":" + alpha.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ",\"scale\":" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", new UTF8Encoding(false));
         }
         catch { }
+    }
+
+    private static void WriteOverlayState(bool on, string pos)
+    {
+        WriteOverlayState(on, pos, OverlayNum("alpha", 1.0), OverlayNum("scale", 1.0));
+    }
+
+    private void SetOverlayAlpha(double alpha)
+    {
+        WriteOverlayState(OverlayOn(), OverlayPos(), alpha, OverlayNum("scale", 1.0));
+    }
+
+    private void SetOverlayScale(double scale)
+    {
+        WriteOverlayState(OverlayOn(), OverlayPos(), OverlayNum("alpha", 1.0), scale);
     }
 
     private static void EnsureOverlay()

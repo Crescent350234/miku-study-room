@@ -792,6 +792,8 @@ internal static class Bridge
     {
         bool on = false;
         string pos = "top";
+        double alpha = 1.0;
+        double scale = 1.0;
         try
         {
             string p = OverlayStatePath();
@@ -800,13 +802,30 @@ internal static class Bridge
                 string s = File.ReadAllText(p);
                 on = s.IndexOf("\"on\":true", StringComparison.Ordinal) >= 0;
                 pos = s.IndexOf("\"pos\":\"bottom\"", StringComparison.Ordinal) >= 0 ? "bottom" : "top";
+                alpha = JNum(s, "alpha", 1.0);
+                scale = JNum(s, "scale", 1.0);
             }
             on = !on;
             Directory.CreateDirectory(Path.GetDirectoryName(p));
-            File.WriteAllText(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos + "\"}", new UTF8Encoding(false));
+            File.WriteAllText(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos +
+                "\",\"alpha\":" + alpha.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ",\"scale\":" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", new UTF8Encoding(false));
         }
         catch { }
         return on;
+    }
+
+    private static double JNum(string json, string key, double def)
+    {
+        string pat = "\"" + key + "\":";
+        int i = json.IndexOf(pat, StringComparison.Ordinal);
+        if (i < 0) return def;
+        i += pat.Length;
+        int st = i;
+        while (i < json.Length && (char.IsDigit(json[i]) || json[i] == '.' || json[i] == '-')) i++;
+        double v;
+        return double.TryParse(json.Substring(st, i - st), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out v) ? v : def;
     }
 
     private static void EnsureOverlay()

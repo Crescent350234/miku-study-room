@@ -33,6 +33,8 @@ public class OverlayWindow : Window
     private DateTime pushTextAt = DateTime.MinValue;
     private bool visibleWanted = false;
     private string pos = "top";
+    private double alpha = 1.0;
+    private double scale = 1.0;
 
     private string baseUrl = "http://127.0.0.1:51789/";
     private string statePath;
@@ -150,7 +152,16 @@ public class OverlayWindow : Window
             bool on = json.IndexOf("\"on\":true", StringComparison.Ordinal) >= 0;
             string p = StrField(json, "pos");
             if (!string.IsNullOrEmpty(p)) pos = p;
+
+            double a = NumDoubleField(json, "alpha");
+            if (a > 0.05) alpha = Math.Min(1.0, a);
+
+            double oldScale = scale;
+            double s = NumDoubleField(json, "scale");
+            if (s > 0.3) scale = Math.Max(0.5, Math.Min(2.0, s));
+
             ApplyVisible(on);
+            if (Math.Abs(oldScale - scale) > 0.001 && !string.IsNullOrEmpty(currentText)) SetScatter(currentText);
         }
         catch { }
     }
@@ -158,6 +169,8 @@ public class OverlayWindow : Window
     private void ApplyVisible(bool on)
     {
         visibleWanted = on;
+        Opacity = alpha;
+        Height = 190 * scale;
         if (on)
         {
             Show();
@@ -260,6 +273,7 @@ public class OverlayWindow : Window
 
         int seed = text.GetHashCode();
         double baseSize = units.Count > 16 ? 28 : (units.Count > 11 ? 32 : 38);
+        baseSize *= scale;
         var fp = FontFor(fontId);
 
         for (int i = 0; i < units.Count; i++)
@@ -388,6 +402,19 @@ public class OverlayWindow : Window
             sb.Append(c);
         }
         return sb.ToString();
+    }
+
+    private static double NumDoubleField(string json, string key)
+    {
+        string pat = "\"" + key + "\":";
+        int i = json.IndexOf(pat, StringComparison.Ordinal);
+        if (i < 0) return -1;
+        i += pat.Length;
+        int start = i;
+        while (i < json.Length && (char.IsDigit(json[i]) || json[i] == '.' || json[i] == '-')) i++;
+        double v;
+        return double.TryParse(json.Substring(start, i - start), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out v) ? v : -1;
     }
 
     private static long NumField(string json, string key)
