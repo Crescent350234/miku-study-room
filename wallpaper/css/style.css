@@ -4036,3 +4036,39 @@ body.focus-on .drawer {
 .lyrics-area {
   --s: calc(min(0.0390625vw, 0.069444vh) * var(--lyric-scale));
 }
+
+/* 设置面板放大，避免控件拥挤 */
+.settings {
+  width: min(780px, 90vw);
+  max-height: 90vh;
+  padding: calc(26 * var(--s)) 0 calc(22 * var(--s));
+}
+
+.settings .settings-head {
+  padding: 0 calc(28 * var(--s)) calc(14 * var(--s));
+  font-size: calc(15 * var(--s));
+}
+
+.settings .style-box {
+  padding: 0 calc(28 * var(--s)) calc(16 * var(--s));
+}
+
+.settings .ai-box,
+.settings .lyric-offset {
+  padding-left: calc(28 * var(--s));
+  padding-right: calc(28 * var(--s));
+}
+
+.settings .style-title {
+  font-size: calc(13 * var(--s));
+  margin: calc(16 * var(--s)) 0 calc(9 * var(--s));
+}
+
+.settings .chip-row {
+  gap: calc(10 * var(--s));
+}
+
+.settings .style-chip {
+  padding: calc(7 * var(--s)) calc(16 * var(--s));
+  font-size: calc(13 * var(--s));
+}
