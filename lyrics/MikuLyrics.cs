@@ -329,6 +329,27 @@ public class OverlayWindow : Window
         return MintPalette[4];
     }
 
+    private static FontFamily EnSerifFamily()
+    {
+        try
+        {
+            string[] cands = new string[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"fonts\Playfair.ttf"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Playfair.ttf"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\fonts\Playfair.ttf")
+            };
+            foreach (string f in cands)
+            {
+                if (!File.Exists(f)) continue;
+                string dir = Path.GetDirectoryName(f).Replace('\\', '/');
+                return new FontFamily(new Uri("file:///" + dir + "/"), "./Playfair.ttf#Playfair Display");
+            }
+        }
+        catch { }
+        return new FontFamily("Georgia");
+    }
+
     private static FontPick FontFor(string id)
     {
         switch (id)
@@ -342,6 +363,7 @@ public class OverlayWindow : Window
             case "lishu": return new FontPick(new FontFamily("LiSu"), FontWeights.Normal);
             case "light": return new FontPick(new FontFamily("DengXian Light"), FontWeights.Light);
             case "hei": return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Bold);
+            case "en-serif": return new FontPick(EnSerifFamily(), FontWeights.Normal);
             default: return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Light);
         }
     }

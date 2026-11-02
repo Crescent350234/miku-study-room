@@ -147,6 +147,14 @@ try {
     $dstAi = Join-Path $bridgeDir 'ai.ini'
     if (-not (Test-Path $dstAi)) { Copy-Item (Join-Path $root 'bridge\ai.ini') $dstAi -Force }
 
+    if (Test-Path (Join-Path $root 'fonts')) {
+        Copy-Item (Join-Path $root 'fonts') (Join-Path $data 'fonts') -Recurse -Force
+    }
+    foreach ($extra in @('MikuTray.exe', 'MikuLyrics.exe')) {
+        $srcExtra = Join-Path $root $extra
+        if (Test-Path $srcExtra) { Copy-Item $srcExtra (Join-Path $data $extra) -Force }
+    }
+
     $bridgeExe = Join-Path $bridgeDir 'bridge.exe'
     $watchdogExe = Join-Path $bridgeDir 'watchdog.exe'
     Start-Process $bridgeExe -WorkingDirectory $bridgeDir -WindowStyle Hidden

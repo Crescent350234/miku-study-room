@@ -2425,7 +2425,8 @@
     { id: 'kai', name: '楷体' },
     { id: 'fangsong', name: '仿宋' },
     { id: 'yahei', name: '雅黑' },
-    { id: 'mono', name: '等宽' }
+    { id: 'mono', name: '等宽' },
+    { id: 'en-serif', name: '英文衬线' }
   ];
 
   function applyLyricFont(id) {

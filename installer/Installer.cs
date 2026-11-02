@@ -297,6 +297,9 @@ class InstallerForm : Form
                 if (File.Exists(srcExtra)) File.Copy(srcExtra, Path.Combine(dataDir, extra), true);
             }
 
+            var fontSrc = Path.Combine(baseDir, "fonts");
+            if (Directory.Exists(fontSrc)) CopyDir(fontSrc, Path.Combine(dataDir, "fonts"));
+
             bool ok = false;
             foreach (var port in new int[] { 51789, 52789, 53789, 54789 })
             {
