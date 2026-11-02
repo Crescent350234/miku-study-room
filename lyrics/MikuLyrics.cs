@@ -251,11 +251,11 @@ public class OverlayWindow : Window
         foreach (string part in Regex.Split(text, @"[，。！？、；：\s]+"))
             if (part.Length > 0) units.Add(part);
 
-        if (units.Count < 3)
+        if (units.Count < 3 && Regex.IsMatch(text, @"[ぁ-ヿ一-鿿]"))
         {
             units.Clear();
             foreach (char ch in text)
-                if (!char.IsWhiteSpace(ch)) units.Add(ch.ToString());
+                if (!char.IsWhiteSpace(ch) && !"，。！？、；：,.!?;:".Contains(ch.ToString())) units.Add(ch.ToString());
         }
 
         int seed = text.GetHashCode();

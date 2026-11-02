@@ -1050,10 +1050,11 @@
     var seed = Math.floor(t0 * 1000) + text.length;
 
     var units = text.split(/[，。！？、；：\s]+/).filter(function (s) { return s.trim().length > 0; });
-    if (units.length < 3) {
-      units = [];
-      var chars = Array.from(text);
-      for (var ci = 0; ci < chars.length; ci += 1) units.push(chars[ci]);
+    var isCjk = /[\u3040-\u30ff\u3400-\u9fff]/.test(text);
+    if (units.length < 3 && isCjk) {
+      units = Array.from(text).filter(function (ch) {
+        return !/\s/.test(ch) && !/[，。！？、；：,.!?;:]/.test(ch);
+      });
     }
 
     S.charAccent = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#8ef';
@@ -1061,11 +1062,6 @@
     main.innerHTML = '';
     var wrap = document.createElement('div');
     wrap.className = 'scatter-wrap';
-
-    var units = text.split(/[，。！？、；：\s]+/).filter(function (s) { return s.trim().length > 0; });
-    if (units.length < 3) {
-      units = Array.from(text).filter(function (ch) { return !/\s/.test(ch); });
-    }
 
     var pal = lyricPalette();
 
