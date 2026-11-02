@@ -16,6 +16,7 @@ public class TrayApp : ApplicationContext
     private ToolStripMenuItem songItem;
     private ToolStripMenuItem playItem;
     private ToolStripMenuItem focusItem;
+    private ToolStripMenuItem overlayItem;
     private System.Windows.Forms.Timer timer;
     private string baseUrl = "http://127.0.0.1:51789/";
     private bool focusOn = false;
@@ -44,6 +45,21 @@ public class TrayApp : ApplicationContext
         focusItem.Click += delegate { ToggleFocus(); };
         menu.Items.Add(focusItem);
 
+        overlayItem = new ToolStripMenuItem("桌面歌词");
+        overlayItem.CheckOnClick = true;
+        overlayItem.Checked = OverlayOn();
+        overlayItem.Click += delegate { SetOverlay(overlayItem.Checked); };
+        menu.Items.Add(overlayItem);
+
+        var posMenu = new ToolStripMenuItem("歌词位置");
+        var posTop = new ToolStripMenuItem("顶部");
+        var posBottom = new ToolStripMenuItem("底部");
+        posTop.Click += delegate { SetOverlayPos("top"); };
+        posBottom.Click += delegate { SetOverlayPos("bottom"); };
+        posMenu.DropDownItems.Add(posTop);
+        posMenu.DropDownItems.Add(posBottom);
+        menu.Items.Add(posMenu);
+
         menu.Items.Add(new ToolStripMenuItem("重启桥接", null, delegate { RestartBridge(); }));
         menu.Items.Add(new ToolStripMenuItem("打开设置", null, delegate { OpenSettings(); }));
         menu.Items.Add(new ToolStripMenuItem("打开壁纸目录", null, delegate { OpenWallpaperDir(); }));
@@ -70,6 +86,7 @@ public class TrayApp : ApplicationContext
         timer.Tick += delegate { RefreshNow(); };
         timer.Start();
 
+        if (OverlayOn()) EnsureOverlay();
         RefreshNow();
     }
 
@@ -238,7 +255,74 @@ public class TrayApp : ApplicationContext
         return null;
     }
 
-    private void OpenWallpaperDir()
+    private static string OverlayStatePath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            @"MikuWallpaper\overlay.json");
+    }
+
+    private static string OverlayExe()
+    {
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MikuLyrics.exe");
+    }
+
+    private static bool OverlayOn()
+    {
+        try
+        {
+            if (!File.Exists(OverlayStatePath())) return false;
+            return File.ReadAllText(OverlayStatePath()).IndexOf("\"on\":true", StringComparison.Ordinal) >= 0;
+        }
+        catch { return false; }
+    }
+
+    private static string OverlayPos()
+    {
+        try
+        {
+            if (!File.Exists(OverlayStatePath())) return "top";
+            string s = File.ReadAllText(OverlayStatePath());
+            return s.IndexOf("\"pos\":\"bottom\"", StringComparison.Ordinal) >= 0 ? "bottom" : "top";
+        }
+        catch { return "top"; }
+    }
+
+    private static void WriteOverlayState(bool on, string pos)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(OverlayStatePath()));
+            File.WriteAllText(OverlayStatePath(),
+                "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos + "\"}", new UTF8Encoding(false));
+        }
+        catch { }
+    }
+
+    private static void EnsureOverlay()
+    {
+        try
+        {
+            if (Process.GetProcessesByName("MikuLyrics").Length > 0) return;
+            string exe = OverlayExe();
+            if (!File.Exists(exe)) return;
+            Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(exe), UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    private void SetOverlay(bool on)
+    {
+        WriteOverlayState(on, OverlayPos());
+        if (on) EnsureOverlay();
+        icon.ShowBalloonTip(1000, "Miku", on ? "桌面歌词已开启" : "桌面歌词已关闭", ToolTipIcon.None);
+    }
+
+    private void SetOverlayPos(string pos)
+    {
+        WriteOverlayState(OverlayOn(), pos);
+    }
+
+    private static void OpenWallpaperDir()
     {
         string dir = ProjectDir();
         if (string.IsNullOrEmpty(dir))
