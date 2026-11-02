@@ -18,6 +18,15 @@ public class OverlayWindow : Window
     private static extern int GetWindowLong(IntPtr h, int index);
     [DllImport("user32.dll")]
     private static extern int SetWindowLong(IntPtr h, int index, int value);
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOACTIVATE = 0x0010;
+
+    private IntPtr hwnd;
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TRANSPARENT = 0x20;
@@ -104,9 +113,9 @@ public class OverlayWindow : Window
 
         SourceInitialized += delegate
         {
-            IntPtr h = new WindowInteropHelper(this).Handle;
-            int ex = GetWindowLong(h, GWL_EXSTYLE);
-            SetWindowLong(h, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+            hwnd = new WindowInteropHelper(this).Handle;
+            int ex = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
         };
 
         LoadState();
@@ -115,6 +124,15 @@ public class OverlayWindow : Window
         pushTimer.Interval = TimeSpan.FromMilliseconds(150);
         pushTimer.Tick += delegate { FetchPush(); };
         pushTimer.Start();
+
+        var topTimer = new DispatcherTimer();
+        topTimer.Interval = TimeSpan.FromMilliseconds(1200);
+        topTimer.Tick += delegate
+        {
+            if (visibleWanted && hwnd != IntPtr.Zero)
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        };
+        topTimer.Start();
 
         stateTimer = new DispatcherTimer();
         stateTimer.Interval = TimeSpan.FromMilliseconds(500);
