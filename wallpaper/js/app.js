@@ -2648,7 +2648,10 @@
     var focusBtn = $('focusBtn');
     if (focusBtn) {
       var focusBusy = false;
-      var applyFocusBtn = function (on) { focusBtn.classList.toggle('on', !!on); };
+      var applyFocusBtn = function (on) {
+        focusBtn.classList.toggle('on', !!on);
+        document.body.classList.toggle('focus-on', !!on);
+      };
       var syncFocus = function () {
         fetch(BRIDGE + 'focus.json', { cache: 'no-store' })
           .then(function (r) { return r.json(); })
@@ -2666,6 +2669,11 @@
           .then(function (r) { return r.json(); })
           .then(function (d) {
             applyFocusBtn(d.focus);
+            if (d.focus) {
+              el.drawer.classList.remove('open');
+              if (el.settingsPanel) el.settingsPanel.classList.remove('open');
+              if (window.__syncPanels) window.__syncPanels();
+            }
             toast(d.focus ? '纯净模式：已隐藏桌面图标和任务栏' : '纯净模式：已恢复');
           })
           .catch(function () { toast('纯净模式切换失败'); })

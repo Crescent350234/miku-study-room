@@ -4023,3 +4023,8 @@ body.font-en-serif .line .main {
   font-weight: 400;
   letter-spacing: 0.02em;
 }
+
+body.focus-on .settings,
+body.focus-on .drawer {
+  display: none !important;
+}
