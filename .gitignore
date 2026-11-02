@@ -13,3 +13,6 @@ backup-before-v2-*
 bridge/port.txt
 bridge/pomo.json
 pomo.json
+_v*/
+*.bundle
+MikuTray.exe
