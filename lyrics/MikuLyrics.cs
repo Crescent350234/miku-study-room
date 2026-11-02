@@ -199,6 +199,7 @@ public class OverlayWindow : Window
         {
             pushText = txt;
             pushTextAt = DateTime.Now;
+            SetScatter(txt);
             Log(@"MikuWallpaper\lyrics-overlay-push.log", txt);
         }
     }
