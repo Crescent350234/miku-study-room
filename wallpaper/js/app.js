@@ -15,13 +15,14 @@
   var DEMO = params.has('demo') || !WE;
 
   var METING = 'https://api.injahow.cn/meting/';
-  var PLAYLIST_ID = '17543418420';
+  var PLAYLIST_ID = '18367646385';
   var BRIDGE = 'http://127.0.0.1:51789/';
 
   var BACKGROUNDS = [
     { src: 'assets/bg/2.webm', poster: 'assets/bg/2.jpg' },
     { src: 'assets/bg/3.webm', poster: 'assets/bg/3.jpg' },
-    { src: 'assets/bg/1.webm', poster: 'assets/bg/1.jpg' }
+    { src: 'assets/bg/1.webm', poster: 'assets/bg/1.jpg' },
+    { src: 'custom/bg.webm', poster: 'custom/bg.jpg', custom: true }
   ];
 
   var el = {
@@ -832,17 +833,6 @@
       });
       col.appendChild(textCol);
 
-      if (line.sub) {
-        var subCol = document.createElement('div');
-        subCol.className = 'qs-text qs-sub-text';
-        Array.from(line.sub).forEach(function (ch) {
-          var sp = document.createElement('span');
-          sp.className = 'qs-sub-char';
-          sp.textContent = ch === ' ' ? '\u00a0' : ch;
-          subCol.appendChild(sp);
-        });
-        col.appendChild(subCol);
-      }
 
       track.appendChild(col);
     });
@@ -860,7 +850,11 @@
     ensureQsTrack();
     var layer = $('qsLayer');
     if (!layer || !S.qsTrack || !S.qsCols || !S.qsCols.length) return;
-    if (S.lrcIndex < 0) return;
+    if (S.lrcIndex < 0) {
+      S.qsTrack.style.opacity = '0';
+      return;
+    }
+    S.qsTrack.style.opacity = '1';
 
     var idx = Math.min(S.lrcIndex, S.qsCols.length - 1);
     if (S.qsLastIdx === idx) return;
@@ -880,6 +874,238 @@
     S.qsTrack.style.transform = 'translateX(' + x.toFixed(1) + 'px)';
   }
 
+
+
+  function clearCylinder() {
+    var layer = $('cylLayer');
+    if (layer) layer.innerHTML = '';
+  }
+
+  function buildCylinderSvg() {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 600 600');
+    svg.setAttribute('class', 'cyl5-svg');
+
+    function el(tag, attrs, parent) {
+      var n = document.createElementNS(NS, tag);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      (parent || svg).appendChild(n);
+      return n;
+    }
+
+    function noise(seed) {
+      var x = Math.sin(seed * 12.9898) * 43758.5453;
+      return x - Math.floor(x);
+    }
+
+    function roughCircle(cx, cy, r, seed, seg) {
+      var pts = [];
+      seg = seg || 72;
+      for (var i = 0; i < seg; i++) {
+        var a = i / seg * Math.PI * 2;
+        var rr = r + (noise(seed + i * 7.3) - 0.5) * 3.2;
+        pts.push([cx + Math.sin(a) * rr, cy - Math.cos(a) * rr]);
+      }
+      var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+      for (var p = 1; p < pts.length; p++) d += ' L' + pts[p][0].toFixed(1) + ' ' + pts[p][1].toFixed(1);
+      return d + ' Z';
+    }
+
+    function gearPoints(cx, cy, rRoot, rOut, teeth, seed) {
+      var pts = [];
+      var step = Math.PI * 2 / teeth;
+      for (var i = 0; i < teeth; i++) {
+        var a = i * step;
+        var defs = [
+          [a, rRoot], [a + step * 0.24, rRoot], [a + step * 0.32, rOut],
+          [a + step * 0.68, rOut], [a + step * 0.76, rRoot], [a + step, rRoot]
+        ];
+        for (var k = 0; k < defs.length; k++) {
+          var ang = defs[k][0];
+          var rad = defs[k][1] + (noise(seed + i * 11 + k * 3.7) - 0.5) * 2.4;
+          pts.push([cx + Math.sin(ang) * rad, cy - Math.cos(ang) * rad]);
+        }
+      }
+      return pts;
+    }
+
+    function ptsToPath(pts) {
+      var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+      for (var i = 1; i < pts.length; i++) d += ' L' + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1);
+      return d + ' Z';
+    }
+
+    var line = 'rgba(226, 224, 214, 0.88)';
+    var soft = 'rgba(226, 224, 214, 0.34)';
+    var gearPts = gearPoints(300, 300, 268, 292, 24, 3.1);
+    var gear = ptsToPath(gearPts);
+
+    var defs = el('defs', {});
+
+    var mask = el('mask', { id: 'cylHollow', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: 600, height: 600 }, defs);
+    el('path', { d: gear, fill: '#fff' }, mask);
+    for (var c = 0; c < 6; c++) {
+      var ca = 30 + c * 60;
+      var cg = el('g', { transform: 'rotate(' + ca + ' 300 300)' }, mask);
+      el('circle', { cx: 300, cy: 112, r: 55, fill: '#000' }, cg);
+    }
+    el('circle', { cx: 300, cy: 300, r: 73, fill: '#000' }, mask);
+
+    // 轮体：深色，接近不透明
+    el('path', { d: gear, fill: 'rgba(10, 14, 14, 0.16)', mask: 'url(#cylHollow)' });
+
+    // 手绘外轮廓：两遍
+    el('path', { d: gear, fill: 'none', stroke: line, 'stroke-width': 1.5, 'stroke-linejoin': 'round' });
+    el('path', {
+      d: gear, fill: 'none', stroke: soft, 'stroke-width': 1,
+      transform: 'translate(1.4 1.1)'
+    });
+
+    // 排线阴影（两方向）
+    var clip = el('clipPath', { id: 'cylBodyClip' }, defs);
+    el('path', { d: gear, fill: '#fff' }, clip);
+
+    var hatch = el('g', { 'clip-path': 'url(#cylBodyClip)', mask: 'url(#cylHollow)' });
+    for (var h = 0; h < 40; h++) {
+      el('line', {
+        x1: -80 + h * 13, y1: -20,
+        x2: -80 + h * 13 + 430, y2: 640,
+        stroke: 'rgba(222, 220, 210, 0.10)', 'stroke-width': 1
+      }, hatch);
+    }
+    for (var h2 = 0; h2 < 26; h2++) {
+      el('line', {
+        x1: -20 + h2 * 20, y1: 620,
+        x2: -20 + h2 * 20 + 260, y2: -20,
+        stroke: 'rgba(222, 220, 210, 0.06)', 'stroke-width': 1
+      }, hatch);
+    }
+
+    // 内圈手绘线
+    el('path', { d: roughCircle(300, 300, 244, 9.2), fill: 'none', stroke: soft, 'stroke-width': 1 });
+    el('path', { d: roughCircle(300, 300, 228, 13.7), fill: 'none', stroke: soft, 'stroke-width': 1, 'stroke-dasharray': '4 7' });
+
+    // 弹膛：手绘双圈
+    for (var c2 = 0; c2 < 6; c2++) {
+      var ca2 = 30 + c2 * 60;
+      var g2 = el('g', { transform: 'rotate(' + ca2 + ' 300 300)' });
+      var dash = c2 === 0 ? '6 6' : 'none';
+      el('path', {
+        d: roughCircle(300, 112, 55, 21 + c2 * 3.3),
+        fill: 'none', stroke: line, 'stroke-width': 1.6, 'stroke-dasharray': dash
+      }, g2);
+      el('path', {
+        d: roughCircle(300, 112, 55, 21 + c2 * 3.3),
+        fill: 'none', stroke: soft, 'stroke-width': 1,
+        transform: 'translate(1.6 1.2)'
+      }, g2);
+      el('path', {
+        d: roughCircle(300, 112, 43, 31 + c2 * 3.3),
+        fill: 'none', stroke: soft, 'stroke-width': 1
+      }, g2);
+    }
+
+    // 辐条
+    for (var s = 0; s < 6; s++) {
+      var sa = 30 + s * 60;
+      var sg = el('g', { transform: 'rotate(' + sa + ' 300 300)' });
+      el('line', { x1: 300, y1: 176, x2: 300, y2: 222, stroke: soft, 'stroke-width': 1 }, sg);
+    }
+
+    // 中心小齿轮
+    var hub = ptsToPath(gearPoints(300, 300, 76, 88, 12, 41.7));
+    el('path', { d: hub, fill: 'none', stroke: line, 'stroke-width': 1.3 });
+    el('path', { d: hub, fill: 'none', stroke: soft, 'stroke-width': 1, transform: 'translate(1.2 1)' });
+    el('path', { d: roughCircle(300, 300, 55, 55.5), fill: 'none', stroke: soft, 'stroke-width': 1 });
+    el('path', { d: roughCircle(300, 300, 16, 61.1), fill: 'none', stroke: line, 'stroke-width': 1.2 });
+    el('circle', { cx: 300, cy: 300, r: 4, fill: 'rgba(230, 228, 218, 0.75)' });
+
+    return svg;
+  }
+
+
+  function buildCylinderLine(idx) {
+    var layer = $('cylLayer');
+    if (!layer) return;
+    if (idx < 0 || idx >= S.lrc.length) { return; }
+
+    layer.innerHTML = '';
+
+    var scene = document.createElement('div');
+    scene.className = 'cyl5-scene';
+
+    var wheel = document.createElement('div');
+    wheel.className = 'cyl5-wheel';
+
+    var rotor = document.createElement('div');
+    rotor.className = 'cyl5-rotor';
+    rotor.appendChild(buildCylinderSvg());
+
+    wheel.appendChild(rotor);
+    scene.appendChild(wheel);
+    layer.appendChild(scene);
+
+    var wheelW = wheel.getBoundingClientRect().width || 300;
+    var R = Math.max(100, Math.round(wheelW * 0.313));
+
+    var slots = [
+      { off: 0,  a: 90  },
+      { off: -1, a: 150 },
+      { off: -2, a: 210 },
+      { off: 1,  a: 330 },
+      { off: 2,  a: 270 }
+    ];
+
+    for (var s = 0; s < slots.length; s++) {
+      var li = idx + slots[s].off;
+      if (li < 0 || li >= S.lrc.length) continue;
+      var line = S.lrc[li];
+      if (!line || !line.text) continue;
+
+      var holder = document.createElement('div');
+      holder.className = 'cyl5-label' + (li === idx ? ' current' : '');
+      holder.style.cssText =
+        'position:absolute;left:50%;top:50%;transform-origin:0 50%;' +
+        'transform:rotate(' + slots[s].a + 'deg) translateY(-' + R + 'px) rotate(-90deg);';
+
+      var body = document.createElement('div');
+      body.className = 'cyl5-label-body';
+
+      var txt = document.createElement('span');
+      txt.className = 'cyl5-label-text';
+      txt.textContent = line.text;
+      txt.style.cssText =
+        'display:inline-block;white-space:nowrap;font-weight:300;letter-spacing:0.06em;' +
+        'font-size:' + (li === idx ? 26 : 20) + 'px;' +
+        'color:' + (li === idx ? '#8ff0e2' : 'rgba(228,236,232,0.42)') + ';';
+      body.appendChild(txt);
+
+      if (li === idx && line.sub) {
+        var sb = document.createElement('span');
+        sb.className = 'cyl5-label-sub';
+        sb.textContent = line.sub;
+        sb.style.cssText =
+          'display:block;white-space:nowrap;margin-top:6px;font-size:15px;' +
+          'color:rgba(200,222,216,0.55);';
+        body.appendChild(sb);
+      }
+
+      holder.appendChild(body);
+      if (li === idx) {
+        var d0 = 4;
+        if (S.lrc[idx + 1]) d0 = Math.max(2.8, Math.min(6, S.lrc[idx + 1].t - S.lrc[idx].t));
+        body.style.animationDuration = d0.toFixed(2) + 's';
+      }
+      rotor.appendChild(holder);
+    }
+
+    rotor.style.transform = 'rotate(60deg)';
+    requestAnimationFrame(function () {
+      rotor.style.transition = 'transform 0.62s cubic-bezier(0.18, 0.8, 0.22, 1)';
+      rotor.style.transform = 'rotate(0deg)';
+    });
+  }
 
   function buildQingshuLine(idx) {
     var nodes = el.lyrics.children;
@@ -1165,11 +1391,11 @@
         (function (idx) {
           var b = document.createElement('button');
           b.className = 'style-chip' + (bgIndex === idx ? ' on' : '');
-          b.textContent = '场景 ' + (idx + 1);
+          b.textContent = BACKGROUNDS[idx].custom ? '自定义' : ('场景 ' + (idx + 1));
           b.addEventListener('click', function () {
             applyBg(idx);
             renderSceneChips();
-            toast('背景 · 场景 ' + (idx + 1));
+            toast('背景 · ' + (BACKGROUNDS[idx].custom ? '自定义' : ('场景 ' + (idx + 1))));
           });
           el.bgChips.appendChild(b);
         })(i);
@@ -1239,6 +1465,7 @@
     if (S.lyricTheme === 'scatter') { buildScatterLine(idx); return; }
     if (S.lyricTheme === 'qingshu') { return; }
     
+    if (S.lyricTheme === 'cylinder') { buildCylinderLine(idx); return; }
     if (S.lyricTheme === 'bubble') return;
     return;
     var nodes = el.lyrics.children;
@@ -1387,6 +1614,34 @@
   /* ------------------------------------------------------------------
      播放列表
   ------------------------------------------------------------------ */
+
+  function loadPlaylistConfig() {
+    return fetch('playlist.txt', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (txt) {
+        var id = (txt || '').trim().split(/\s+/)[0];
+        if (/^\d+$/.test(id)) PLAYLIST_ID = id;
+      })
+      .catch(function () {});
+  }
+
+  function fetchLocalPlaylist() {
+    return fetch('music/playlist.json', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (data) {
+        if (!Array.isArray(data) || !data.length) return [];
+        return data.map(function (s) {
+          return {
+            name: cleanName(s.name || s.file || '未知曲目'),
+            artist: s.artist || '本地',
+            url: 'music/' + s.file,
+            lrc: s.lrc ? ('music/' + s.lrc) : '',
+            pic: ''
+          };
+        }).filter(function (s) { return s.url; });
+      })
+      .catch(function () { return []; });
+  }
 
   function fetchPlaylist() {
     return fetch(METING + '?server=netease&type=playlist&id=' + encodeURIComponent(PLAYLIST_ID))
@@ -1550,7 +1805,7 @@
           if (changed) {
             if (d.pic) { var _p = d.pic.replace(/^http:/, 'https:'); el.cover.src = _p; applyCoverPalette(_p); }
             if (d.duration) S.duration = d.duration;
-            if (idChanged) { S.position = 0; S.mirrorUserPaused = false; }
+            if (idChanged) { S.position = 0; S.mirrorUserPaused = false; S.mirrorAnchorTime = null; S.mirrorAnchorPos = 0; }
             if (d.lrc) loadLyrics(d.lrc, d.title);
           setTimeout(function () { maybeAiTheme(d); }, 1500);
             renderProgress();
@@ -1683,6 +1938,21 @@
     if (S.mode !== 'local') return;
     S.duration = el.audio.duration || 0;
     renderProgress();
+  });
+
+  el.audio.addEventListener('playing', function () {
+    S.audioSkipFails = 0;
+  });
+
+  el.audio.addEventListener('error', function () {
+    if (S.mode !== 'local') return;
+    S.audioSkipFails = (S.audioSkipFails || 0) + 1;
+    if (S.audioSkipFails <= 5) {
+      toast('这首歌无法播放，已跳过');
+      nextSong(1);
+    } else {
+      toast('连续多首无法播放，可能是会员歌曲');
+    }
   });
 
   el.audio.addEventListener('play', function () { setPlaying(true); });
@@ -1969,12 +2239,48 @@
   var bgTimer = null;
   var bgFails = 0;
 
+  function autoCustomBg() {
+    function pick(src) {
+      for (var i = 0; i < BACKGROUNDS.length; i++) {
+        if (!BACKGROUNDS[i].custom) continue;
+        BACKGROUNDS[i].imageOnly = true;
+        BACKGROUNDS[i].poster = src;
+        bgIndex = i;
+        applyBg(i);
+        renderSceneChips();
+        return;
+      }
+    }
+
+    var jpg = new Image();
+    jpg.onload = function () { pick('custom/bg.jpg'); };
+    jpg.onerror = function () {
+      var png = new Image();
+      png.onload = function () { pick('custom/bg.png'); };
+      png.src = 'custom/bg.png';
+    };
+    jpg.src = 'custom/bg.jpg';
+  }
+
   function applyBg(i) {
     bgIndex = ((i % BACKGROUNDS.length) + BACKGROUNDS.length) % BACKGROUNDS.length;
     var item = BACKGROUNDS[bgIndex];
 
     el.bg.classList.remove('ready');
     clearTimeout(bgTimer);
+
+    if (item.imageOnly) {
+      el.bg.pause();
+      el.bg.removeAttribute('src');
+      el.bg.load();
+      el.bg.style.display = 'none';
+      el.bgStill.style.display = 'block';
+      el.bgStill.src = item.poster;
+      return;
+    }
+
+    el.bg.style.display = '';
+    el.bgStill.style.display = '';
 
     // 先显示静态帧，视频就绪后再淡入
     if (el.bgStill.src.indexOf(item.poster) === -1) {
@@ -1994,8 +2300,30 @@
     el.bg.classList.add('ready');
   });
 
+  el.bgStill.addEventListener('error', function () {
+    var item = BACKGROUNDS[bgIndex];
+    if (item && item.custom && !item.triedPng) {
+      item.triedPng = true;
+      item.imageOnly = true;
+      item.poster = 'custom/bg.png';
+      el.bgStill.src = 'custom/bg.png';
+      return;
+    }
+    if (item && item.custom) {
+      item.imageOnly = false;
+      applyBg(0);
+    }
+  });
+
   el.bg.addEventListener('error', function () {
     el.bg.classList.remove('ready');
+    var item = BACKGROUNDS[bgIndex];
+    if (item && item.custom && !item.triedImage) {
+      item.triedImage = true;
+      item.imageOnly = true;
+      applyBg(bgIndex);
+      return;
+    }
     bgFails++;
     if (bgFails < BACKGROUNDS.length) applyBg(bgIndex + 1);
   });
@@ -2060,8 +2388,15 @@
       updateLyrics(S.position);
     } else {
       if (S.mirror.playing && S.playing) {
-        S.position = Math.min(S.duration || 1e9, S.position + realDt);
+        if (!S.mirrorAnchorTime) {
+          S.mirrorAnchorTime = now;
+          S.mirrorAnchorPos = S.position;
+        }
+        S.position = Math.min(S.duration || 1e9, S.mirrorAnchorPos + (now - S.mirrorAnchorTime) / 1000);
         renderProgress();
+      } else {
+        S.mirrorAnchorTime = null;
+        S.mirrorAnchorPos = S.position;
       }
       updateLyrics(S.position);
     }
@@ -2070,10 +2405,13 @@
     updateBubbles(dt);
     updateQingshu();
 
+    if (S.lyricTheme === 'cylinder' && S.lrc.length && (S.cylBuiltIdx !== S.lrcIndex || !cylLayer.children.length)) {
+      S.cylBuiltIdx = S.lrcIndex;
+      buildCylinderLine(S.lrcIndex >= 0 ? S.lrcIndex : 0);
+    }
+
     drawSpectrum(now);
 
-    initFx();
-    requestAnimationFrame(fxLoop);
     requestAnimationFrame(loop);
   }
 
@@ -2311,7 +2649,8 @@
     { id: 'lumiere', name: '流光' },
     { id: 'scatter', name: '心象' },
     { id: 'tilt', name: '倾诉' },
-    { id: 'qingshu', name: '青书' }
+    { id: 'qingshu', name: '青书' },
+    { id: 'cylinder', name: '言弹' }
   ];
 
   function applyLyricTheme(id) {
@@ -2531,10 +2870,16 @@
         applyClean(!document.body.classList.contains('clean-wallpaper'));
       });
 
+      window.__exitClean = function () { applyClean(false); };
+
       if (cleanEye) {
-        cleanEye.addEventListener('click', function () {
+        cleanEye.addEventListener('click', function (e) {
+          e.stopPropagation();
           applyClean(false);
         });
+      }
+      if (cleanCover) {
+        cleanCover.addEventListener('click', function () { applyClean(false); });
       }
 
       setInterval(function () {
@@ -2546,8 +2891,22 @@
     }
     sizeSpectrum();
     applyBg(0);
+    autoCustomBg();
     bind();
     initOnboarding();
+    var mirrorFallbackTick = setInterval(function () {
+      if (S.mode === 'local') return;
+      if (!S.mirror.playing || !S.playing) return;
+      if (!S.mirrorAnchorTime) {
+        S.mirrorAnchorTime = performance.now();
+        S.mirrorAnchorPos = S.position;
+      }
+      var elapsed = (performance.now() - S.mirrorAnchorTime) / 1000;
+      S.position = Math.min(S.duration || 1e9, S.mirrorAnchorPos + elapsed);
+      updateLyrics(S.position);
+      renderProgress();
+    }, 250);
+
     var savedTheme = 'plain';
     try { savedTheme = localStorage.getItem('lyricTheme') || 'plain'; } catch (e) {}
     applyLyricTheme(savedTheme);
@@ -2576,7 +2935,12 @@
 
     registerMedia();
 
-    fetchPlaylist()
+    loadPlaylistConfig()
+      .then(function () {
+        return fetchLocalPlaylist().then(function (local) {
+          return (local && local.length) ? local : fetchPlaylist();
+        });
+      })
       .then(function (songs) {
         if (!songs.length) throw new Error('empty');
         S.songs = songs;
@@ -2658,5 +3022,6 @@
     try { seen = localStorage.getItem('onboarded') === '1'; } catch (e) {}
     if (!seen) setTimeout(window.__openGuide, 1500);
   });
+
 
 })();

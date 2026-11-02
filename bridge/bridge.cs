@@ -117,7 +117,9 @@ internal static class Bridge
             "HTTP/1.1 200 OK\r\n" +
             "Content-Type: " + type + "\r\n" +
             "Content-Length: " + body.Length + "\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
+            "Access-Control-Allow-Origin: " + _acao + "\r\n" +
+            "Vary: Origin\r\n" +
+            "X-Content-Type-Options: nosniff\r\n" +
             "Access-Control-Allow-Private-Network: true\r\n" +
             "Cache-Control: no-store\r\n" +
             "Connection: close\r\n\r\n";
@@ -128,6 +130,8 @@ internal static class Bridge
         stream.Flush();
     }
 
+
+    private static string _acao = "null";
 
     private static string Esc(string s)
     {
@@ -502,7 +506,34 @@ internal static class Bridge
     }
 
 
-    private static bool WallpaperControl(string command)
+
+    private static void EnsureWatchdog()
+    {
+        try
+        {
+            if (Process.GetProcessesByName("watchdog").Length > 0) return;
+
+            string[] cands = new string[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "watchdog.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\bridge\watchdog.exe")
+            };
+
+            foreach (string c in cands)
+            {
+                if (!File.Exists(c)) continue;
+                var psi = new ProcessStartInfo(c, "");
+                psi.WorkingDirectory = Path.GetDirectoryName(c);
+                psi.UseShellExecute = true;
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                Process.Start(psi);
+                return;
+            }
+        }
+        catch { }
+    }
+
+    internal static bool WallpaperControl(string command)
     {
         try
         {
@@ -678,10 +709,39 @@ internal static class Bridge
         return "\"" + Esc(s) + "\"";
     }
 
+
+    private static string GetHeader(string request, string name)
+    {
+        foreach (string line in request.Split('\n'))
+        {
+            int c = line.IndexOf(':');
+            if (c <= 0) continue;
+            if (line.Substring(0, c).Trim().Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                string v = line.Substring(c + 1).Trim();
+                StringBuilder sb = new StringBuilder();
+                foreach (char ch in v)
+                {
+                    if (ch >= 32 && ch != '"') sb.Append(ch);
+                }
+                return sb.ToString();
+            }
+        }
+        return null;
+    }
+
+    private static void Send403(NetworkStream stream)
+    {
+        byte[] b = Encoding.ASCII.GetBytes("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        stream.Write(b, 0, b.Length);
+        stream.Flush();
+    }
+
     private static void Main()
     {
         bool createdNew;
         LoadHotkeys();
+        FocusMode.Start();
 
         using (var mutex = new Mutex(true, "NowPlayingWallpaperBridge", out createdNew))
         {
@@ -736,6 +796,29 @@ internal static class Bridge
                         string[] parts = request.Split(' ');
                         if (parts.Length > 1) { rawPath = parts[1]; path = rawPath.ToLowerInvariant(); }
 
+                        string origin = GetHeader(request, "Origin");
+                        string referer = GetHeader(request, "Referer");
+                        bool blockedOrigin = false;
+
+                        if (!string.IsNullOrEmpty(origin))
+                        {
+                            string o = origin.Trim().ToLowerInvariant();
+                            if (o != "null" && !o.StartsWith("file:")) blockedOrigin = true;
+                        }
+                        else if (!string.IsNullOrEmpty(referer))
+                        {
+                            string rf = referer.Trim().ToLowerInvariant();
+                            if (rf.StartsWith("http://") || rf.StartsWith("https://")) blockedOrigin = true;
+                        }
+
+                        if (blockedOrigin)
+                        {
+                            Send403(stream);
+                            continue;
+                        }
+
+                        _acao = string.IsNullOrEmpty(origin) ? "null" : origin.Trim();
+
                         if (path.StartsWith("/queue.version"))
                         {
                             string version;
@@ -766,6 +849,7 @@ internal static class Bridge
                         {
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(GetNowJson()));
                         }
+
                         else
                         {
                             if (path.StartsWith("/next")) SendAction("next");
@@ -775,6 +859,25 @@ internal static class Bridge
                         {
                             try { Process.Start(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AiSettings.exe")); } catch { }
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
+                        }
+                        else if (path.StartsWith("/focus.toggle")) { FocusMode.Toggle(); Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"focus\":" + (FocusMode.IsOn ? "true" : "false") + "}")); }
+                                                else if (path.StartsWith("/restart.all"))
+                        {
+                            Send(stream, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("ok"));
+                            ThreadPool.QueueUserWorkItem(delegate
+                            {
+                                try { EnsureWatchdog(); } catch { }
+                                Thread.Sleep(800);
+                                try
+                                {
+                                    var wq = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:51790/restart");
+                                    wq.Timeout = 2000;
+                                    using (var wr = (HttpWebResponse)wq.GetResponse()) { }
+                                }
+                                catch { }
+                                Thread.Sleep(300);
+                                Environment.Exit(0);
+                            });
                         }
                         else if (path.StartsWith("/hideicons")) WallpaperControl("hideIcons");
                             else if (path.StartsWith("/showicons")) WallpaperControl("showIcons");
@@ -788,5 +891,102 @@ internal static class Bridge
                 }
             }
         }
+    }
+}
+
+
+internal static class FocusMode
+{
+    [DllImport("user32.dll")]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+    [DllImport("user32.dll")]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr FindWindow(string cls, string win);
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr h, int cmd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MSG
+    {
+        public IntPtr hwnd;
+        public uint message;
+        public IntPtr wParam;
+        public IntPtr lParam;
+        public uint time;
+        public int ptX;
+        public int ptY;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+    [DllImport("user32.dll")]
+    private static extern bool TranslateMessage(ref MSG lpMsg);
+    [DllImport("user32.dll")]
+    private static extern IntPtr DispatchMessage(ref MSG lpMsg);
+
+    private const int HOTKEY_ID = 0xB10F;
+    private const uint MOD_ALT = 0x0001;
+    private const uint MOD_CONTROL = 0x0002;
+    private const uint MOD_SHIFT = 0x0004;
+    private const uint VK_F = 0x46;
+
+    public static bool IsOn { get; private set; }
+
+    public static void Start()
+    {
+        var th = new Thread(Loop);
+        th.IsBackground = true;
+        th.Start();
+    }
+
+    private static void Loop()
+    {
+        try
+        {
+            uint[][] combos = new uint[][]
+            {
+                new uint[] { MOD_CONTROL | MOD_ALT, 0x46 },   // Ctrl+Alt+F
+                new uint[] { MOD_CONTROL | MOD_ALT, 0x4D },   // Ctrl+Alt+M
+                new uint[] { MOD_CONTROL | MOD_SHIFT, 0x46 }, // Ctrl+Shift+F
+                new uint[] { MOD_ALT | MOD_SHIFT, 0x46 },     // Alt+Shift+F
+                new uint[] { 0, 0x77 }                        // F8
+            };
+            bool ok = false;
+            string picked = "";
+            foreach (uint[] c in combos)
+            {
+                if (RegisterHotKey(IntPtr.Zero, HOTKEY_ID, c[0], c[1])) { ok = true; picked = c[0] + "/" + c[1]; break; }
+            }
+            try { File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "focus.log"), DateTime.Now.ToString("HH:mm:ss") + " hotkey=" + ok + " " + picked + "\r\n"); } catch { }
+            if (!ok) return;
+        }
+        catch { return; }
+
+        MSG msg;
+        while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
+        {
+            if (msg.message == 0x0312 && msg.wParam.ToInt32() == HOTKEY_ID) Toggle();
+            TranslateMessage(ref msg);
+            DispatchMessage(ref msg);
+        }
+    }
+
+    public static void Toggle()
+    {
+        IsOn = !IsOn;
+
+        try
+        {
+            Bridge.WallpaperControl(IsOn ? "hideIcons" : "showIcons");
+        }
+        catch { }
+
+        try
+        {
+            IntPtr tray = FindWindow("Shell_TrayWnd", null);
+            if (tray != IntPtr.Zero) ShowWindow(tray, IsOn ? 0 : 5);
+        }
+        catch { }
     }
 }

@@ -1,4 +1,4 @@
-demo/
+﻿demo/
 edge-debug/
 tools/
 source/
@@ -8,3 +8,8 @@ search.log
 *.log
 .DS_Store
 bridge/ai.ini
+*.png
+backup-before-v2-*
+bridge/port.txt
+bridge/pomo.json
+pomo.json

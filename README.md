@@ -1,4 +1,4 @@
-# Miku Study Room · 音乐壁纸 v2.0
+# Miku Study Room · 音乐壁纸 v2.2
 
 一张会跟着网易云音乐变化的 Wallpaper Engine 网页壁纸：动态场景、居中滚动歌词、封面、进度、切歌。
 

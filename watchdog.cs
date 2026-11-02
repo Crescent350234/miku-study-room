@@ -92,18 +92,37 @@ class Watchdog
                         int n = ns.Read(buf, 0, buf.Length);
                         string req = Encoding.ASCII.GetString(buf, 0, n);
 
+                        string origin = Hdr(req, "Origin");
+                        string referer = Hdr(req, "Referer");
+                        bool blockedOrigin = false;
+                        if (!string.IsNullOrEmpty(origin))
+                        {
+                            string o = origin.ToLowerInvariant();
+                            if (o != "null" && !o.StartsWith("file:")) blockedOrigin = true;
+                        }
+                        else if (!string.IsNullOrEmpty(referer))
+                        {
+                            string rf = referer.ToLowerInvariant();
+                            if (rf.StartsWith("http://") || rf.StartsWith("https://")) blockedOrigin = true;
+                        }
+                        if (blockedOrigin)
+                        {
+                            Write(ns, "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                            continue;
+                        }
+
                         if (req.StartsWith("OPTIONS"))
                         {
-                            Write(ns, "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nContent-Length: 0\r\n\r\n");
+                            Write(ns, "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: " + (string.IsNullOrEmpty(origin) ? "null" : origin) + "\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Private-Network: true\r\nContent-Length: 0\r\n\r\n");
                         }
                         else if (req.IndexOf("/restart") >= 0)
                         {
                             RestartBridge();
-                            Write(ns, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok");
+                            Write(ns, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: " + (string.IsNullOrEmpty(origin) ? "null" : origin) + "\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok");
                         }
                         else
                         {
-                            Write(ns, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\nContent-Length: 8\r\n\r\nwatchdog");
+                            Write(ns, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: " + (string.IsNullOrEmpty(origin) ? "null" : origin) + "\r\nContent-Type: text/plain\r\nContent-Length: 8\r\n\r\nwatchdog");
                         }
                     }
                 }
@@ -111,6 +130,19 @@ class Watchdog
             }
         }
         catch { }
+    }
+
+
+    static string Hdr(string req, string name)
+    {
+        foreach (string line in req.Split('\n'))
+        {
+            int c = line.IndexOf(':');
+            if (c <= 0) continue;
+            if (line.Substring(0, c).Trim().Equals(name, StringComparison.OrdinalIgnoreCase))
+                return line.Substring(c + 1).Trim();
+        }
+        return null;
     }
 
     static void Write(NetworkStream ns, string s)
