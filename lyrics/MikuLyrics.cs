@@ -274,9 +274,14 @@ public class OverlayWindow : Window
             tb.FontWeight = fp.Weight;
             tb.FontSize = baseSize * (0.9 + r * 0.6);
             tb.Margin = new Thickness(0, 0, baseSize * 0.28, 0);
-            tb.Foreground = new SolidColorBrush(r2 < 0.55
-                ? Color.FromRgb(143, 240, 226)
-                : Color.FromRgb(246, 252, 250));
+            tb.Foreground = new SolidColorBrush(PickColor(r, r2, r3));
+            tb.Effect = new DropShadowEffect
+            {
+                Color = Color.FromRgb(10, 22, 20),
+                BlurRadius = 1.6,
+                ShadowDepth = 0,
+                Opacity = 0.62
+            };
             tb.IsHitTestVisible = false;
 
             double dx = (r2 - 0.5) * 18;
@@ -303,6 +308,25 @@ public class OverlayWindow : Window
                 Phase = -r2 * 3
             });
         }
+    }
+
+    private static readonly Color[] MintPalette = new Color[]
+    {
+        Color.FromRgb(47, 107, 98),
+        Color.FromRgb(63, 143, 132),
+        Color.FromRgb(95, 179, 166),
+        Color.FromRgb(143, 240, 226),
+        Color.FromRgb(214, 242, 236)
+    };
+
+    private static Color PickColor(double r, double r2, double r3)
+    {
+        double v = r * 0.45 + r2 * 0.35 + r3 * 0.2;
+        if (v < 0.30) return MintPalette[0];
+        if (v < 0.58) return MintPalette[1];
+        if (v < 0.80) return MintPalette[2];
+        if (v < 0.93) return MintPalette[3];
+        return MintPalette[4];
     }
 
     private static FontPick FontFor(string id)
