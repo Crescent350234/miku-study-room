@@ -274,7 +274,7 @@ public class OverlayWindow : Window
             tb.FontWeight = fp.Weight;
             tb.FontSize = baseSize * (0.9 + r * 0.6);
             tb.Margin = new Thickness(0, 0, baseSize * 0.28, 0);
-            tb.Foreground = new SolidColorBrush(Color.FromRgb(246, 252, 250));
+            tb.Foreground = new SolidColorBrush(Color.FromRgb(143, 240, 226));
             tb.Effect = new DropShadowEffect
             {
                 Color = Color.FromRgb(143, 240, 226),
