@@ -2274,13 +2274,26 @@
       document.body.classList.add('has-cover');
     });
 
+    var navLock = 0;
     el.play.addEventListener('click', toggleAudio);
     el.prev.addEventListener('click', function () {
-      if (S.mode === 'mirror') { sendAction('prev').catch(function () {}); return; }
+      if (S.mode === 'mirror') {
+        var t = Date.now();
+        if (t - navLock < 400) return;
+        navLock = t;
+        sendAction('prev').catch(function () {});
+        return;
+      }
       nextSong(-1);
     });
     el.next.addEventListener('click', function () {
-      if (S.mode === 'mirror') { sendAction('next').catch(function () {}); return; }
+      if (S.mode === 'mirror') {
+        var t = Date.now();
+        if (t - navLock < 400) return;
+        navLock = t;
+        sendAction('next').catch(function () {});
+        return;
+      }
       nextSong(1);
     });
 
@@ -2290,17 +2303,42 @@
     el.pageDown.addEventListener('click', function () {
       el.playlist.scrollBy({ top: Math.max(120, el.playlist.clientHeight * 0.85), behavior: 'smooth' });
     });
-    if (el.settingsBtn) el.settingsBtn.addEventListener('click', function (e) { e.stopPropagation(); var open = el.settingsPanel.classList.toggle('open'); if (open) { closePickers(); } sendAction(open ? 'hideicons' : 'showicons').catch(function () {}); });
-    if (el.closeSettings) el.closeSettings.addEventListener('click', function () { el.settingsPanel.classList.remove('open'); sendAction('showicons').catch(function () {}); });
+    var syncPanels = function () {
+      var anyOpen = el.drawer.classList.contains('open') || (el.settingsPanel && el.settingsPanel.classList.contains('open'));
+      sendAction(anyOpen ? 'hideicons' : 'showicons').catch(function () {});
+    };
+    window.__syncPanels = syncPanels;
+
+    if (el.settingsBtn) el.settingsBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var willOpen = !el.settingsPanel.classList.contains('open');
+      el.settingsPanel.classList.toggle('open', willOpen);
+      if (willOpen) {
+        el.drawer.classList.remove('open');
+        closePickers();
+      }
+      syncPanels();
+    });
+    if (el.closeSettings) el.closeSettings.addEventListener('click', function () {
+      el.settingsPanel.classList.remove('open');
+      syncPanels();
+    });
 
     el.listBtn.addEventListener('click', function () {
-      var open = el.drawer.classList.toggle('open');
-      sendAction(open ? 'hideicons' : 'showicons').catch(function () {});
-      if (open) { scrollActiveIntoView(); setTimeout(syncScrollbar, 80); loadAiSettings(); }
+      var willOpen = !el.drawer.classList.contains('open');
+      el.drawer.classList.toggle('open', willOpen);
+      if (willOpen) {
+        if (el.settingsPanel) el.settingsPanel.classList.remove('open');
+        closePickers();
+        scrollActiveIntoView();
+        setTimeout(syncScrollbar, 80);
+        loadAiSettings();
+      }
+      syncPanels();
     });
     el.closeDrawer.addEventListener('click', function () {
       el.drawer.classList.remove('open');
-      sendAction('showicons').catch(function () {});
+      syncPanels();
     });
 
     document.addEventListener('click', closePickers);
@@ -2609,34 +2647,56 @@
 
     var focusBtn = $('focusBtn');
     if (focusBtn) {
+      var focusBusy = false;
+      var applyFocusBtn = function (on) { focusBtn.classList.toggle('on', !!on); };
+      var syncFocus = function () {
+        fetch(BRIDGE + 'focus.json', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { applyFocusBtn(d.focus); })
+          .catch(function () {});
+      };
+      syncFocus();
+      setInterval(syncFocus, 3000);
+
       focusBtn.addEventListener('click', function () {
         if (!BRIDGE) { toast('桥接未运行'); return; }
+        if (focusBusy) return;
+        focusBusy = true;
         fetch(BRIDGE + 'focus.toggle', { cache: 'no-store' })
           .then(function (r) { return r.json(); })
           .then(function (d) {
-            focusBtn.classList.toggle('on', !!d.focus);
+            applyFocusBtn(d.focus);
             toast(d.focus ? '纯净模式：已隐藏桌面图标和任务栏' : '纯净模式：已恢复');
           })
-          .catch(function () { toast('纯净模式切换失败'); });
+          .catch(function () { toast('纯净模式切换失败'); })
+          .then(function () { focusBusy = false; });
       });
     }
     var lyricsBtn = $('lyricsBtn');
     if (lyricsBtn) {
+      var lyricsBusy = false;
       var applyLyricsBtn = function (on) { lyricsBtn.classList.toggle('on', !!on); };
-      fetch(BRIDGE + 'overlay.json', { cache: 'no-store' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) { applyLyricsBtn(d.on); })
-        .catch(function () {});
+      var syncLyrics = function () {
+        fetch(BRIDGE + 'overlay.json', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { applyLyricsBtn(d.on); })
+          .catch(function () {});
+      };
+      syncLyrics();
+      setInterval(syncLyrics, 3000);
 
       lyricsBtn.addEventListener('click', function () {
         if (!BRIDGE) { toast('桥接未运行'); return; }
+        if (lyricsBusy) return;
+        lyricsBusy = true;
         fetch(BRIDGE + 'overlay.toggle', { cache: 'no-store' })
           .then(function (r) { return r.json(); })
           .then(function (d) {
             applyLyricsBtn(d.on);
             toast(d.on ? '桌面歌词：已开启' : '桌面歌词：已关闭');
           })
-          .catch(function () { toast('桌面歌词切换失败'); });
+          .catch(function () { toast('桌面歌词切换失败'); })
+          .then(function () { lyricsBusy = false; });
       });
     }
 
@@ -2659,7 +2719,12 @@
       var applyClean = function (on) {
         document.body.classList.toggle('clean-wallpaper', on);
         cleanBtn.classList.toggle('on', on);
-        if (on) syncCleanCover();
+        if (on) {
+          el.drawer.classList.remove('open');
+          if (el.settingsPanel) el.settingsPanel.classList.remove('open');
+          if (window.__syncPanels) window.__syncPanels();
+          syncCleanCover();
+        }
         try { localStorage.setItem('cleanWallpaper', on ? '1' : '0'); } catch (e) {}
       };
       var cleanSaved = false;

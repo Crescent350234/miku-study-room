@@ -1075,7 +1075,7 @@ internal static class Bridge
                             });
                         }
                         else if (path.StartsWith("/hideicons")) WallpaperControl("hideIcons");
-                            else if (path.StartsWith("/showicons")) WallpaperControl("showIcons");
+                            else if (path.StartsWith("/showicons")) { if (!FocusMode.IsOn) WallpaperControl("showIcons"); }
                             Send(stream, "image/gif", Gif);
                         }
                     }

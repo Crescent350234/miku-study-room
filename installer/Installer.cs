@@ -4,7 +4,9 @@ using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -14,6 +16,9 @@ class InstallerForm : Form
     static string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MikuWallpaper");
     static string bridgeDir = Path.Combine(dataDir, "bridge");
     static string iniPath = Path.Combine(dataDir, "installer.ini");
+
+    [DllImport("user32.dll")]
+    static extern bool SetProcessDPIAware();
 
     TextBox txtWe;
     Button btnBrowse;
@@ -27,6 +32,8 @@ class InstallerForm : Form
     public InstallerForm()
     {
         Text = "Miku Study Room 安装器";
+        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96F, 96F);
         Width = 720;
         Height = 520;
         StartPosition = FormStartPosition.CenterScreen;
@@ -152,7 +159,27 @@ class InstallerForm : Form
 
     bool ValidWe(string p)
     {
-        return !string.IsNullOrEmpty(p) && File.Exists(Path.Combine(p, "wallpaper32.exe"));
+        return !string.IsNullOrEmpty(p) &&
+            (File.Exists(Path.Combine(p, "wallpaper32.exe")) || File.Exists(Path.Combine(p, "wallpaper64.exe")));
+    }
+
+    static void AddSteamLibraries(string steamRoot, System.Collections.Generic.List<string> list)
+    {
+        try
+        {
+            var vdf = Path.Combine(steamRoot, @"steamapps\libraryfolders.vdf");
+            if (!File.Exists(vdf)) return;
+            foreach (var line in File.ReadAllLines(vdf))
+            {
+                var m = Regex.Match(line, "\"path\"\\s+\"([^\"]+)\"");
+                if (!m.Success) m = Regex.Match(line, "^\\s*\"\\d+\"\\s+\"([^\"]+)\"");
+                if (!m.Success) continue;
+                var lib = m.Groups[1].Value.Replace(@"\\\\", @"\");
+                var cand = Path.Combine(lib, @"steamapps\common\wallpaper_engine");
+                if (!list.Contains(cand)) list.Add(cand);
+            }
+        }
+        catch { }
     }
 
     bool DetectWe()
@@ -164,7 +191,11 @@ class InstallerForm : Form
             {
                 if (k == null) continue;
                 var sp = k.GetValue("SteamPath") as string ?? k.GetValue("InstallPath") as string;
-                if (!string.IsNullOrEmpty(sp)) candidates.Add(Path.Combine(sp, @"steamapps\common\wallpaper_engine"));
+                if (!string.IsNullOrEmpty(sp))
+                {
+                    candidates.Add(Path.Combine(sp, @"steamapps\common\wallpaper_engine"));
+                    AddSteamLibraries(sp, candidates);
+                }
             }
         }
         candidates.Add(@"C:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine");
@@ -188,7 +219,7 @@ class InstallerForm : Form
             if (dlg.ShowDialog() == DialogResult.OK)
             {
                 if (ValidWe(dlg.SelectedPath)) txtWe.Text = dlg.SelectedPath;
-                else MessageBox.Show("这个目录里没有 wallpaper32.exe，请重新选择。", "路径无效", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                else MessageBox.Show("这个目录里没有 wallpaper32.exe 或 wallpaper64.exe，请重新选择。", "路径无效", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
     }
@@ -211,8 +242,29 @@ class InstallerForm : Form
     {
         foreach (var p in Process.GetProcessesByName(name))
         {
-            try { p.Kill(); } catch { }
+            try
+            {
+                string path = null;
+                try { path = p.MainModule.FileName; } catch { }
+                if (!string.IsNullOrEmpty(path) &&
+                    path.IndexOf("MikuWallpaper", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                p.Kill();
+            }
+            catch { }
         }
+    }
+
+    static void StartWeIfNeeded(string we)
+    {
+        try
+        {
+            if (Process.GetProcessesByName("wallpaper32").Length > 0 ||
+                Process.GetProcessesByName("wallpaper64").Length > 0) return;
+            var name = File.Exists(Path.Combine(we, "wallpaper32.exe")) ? "wallpaper32.exe" : "wallpaper64.exe";
+            Process.Start(new ProcessStartInfo(Path.Combine(we, name)) { WorkingDirectory = we, UseShellExecute = true });
+            System.Threading.Thread.Sleep(3000);
+        }
+        catch { }
     }
 
     static void CopyDir(string src, string dst)
@@ -267,6 +319,16 @@ class InstallerForm : Form
 
             Log("复制壁纸工程...");
             var dst = Path.Combine(we, @"projects\myprojects\Miku Study Room");
+            if (Directory.Exists(dst))
+            {
+                try
+                {
+                    var bak = Path.Combine(dataDir, "backup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+                    CopyDir(dst, bak);
+                    Log("已备份旧版壁纸到 " + bak);
+                }
+                catch { Log("旧版备份失败，继续安装。"); }
+            }
             CopyDir(Path.Combine(baseDir, "wallpaper"), dst);
 
             Log("安装控制桥...");
@@ -319,7 +381,11 @@ class InstallerForm : Form
             if (!ok) Log("控制桥未响应，网易云跟随可能不可用。");
 
             Log("应用壁纸...");
-            Process.Start(Path.Combine(we, "wallpaper32.exe"), "-control openWallpaper -file \"" + Path.Combine(dst, "index.html") + "\"");
+            StartWeIfNeeded(we);
+            {
+                var weExe = File.Exists(Path.Combine(we, "wallpaper32.exe")) ? "wallpaper32.exe" : "wallpaper64.exe";
+                Process.Start(Path.Combine(we, weExe), "-control openWallpaper -file \"" + Path.Combine(dst, "index.html") + "\"");
+            }
 
             CreateStartMenuShortcut("Miku 控制中心.lnk", Path.Combine(dataDir, "MikuTray.exe"), dataDir);
             CreateStartMenuShortcut("Miku 壁纸 AI 设置.lnk", Path.Combine(bridgeDir, "AiSettings.exe"), bridgeDir);
@@ -413,7 +479,9 @@ class InstallerForm : Form
                 MessageBox.Show("还没有安装壁纸，请先点击“安装 / 更新”。");
                 return;
             }
-            Process.Start(Path.Combine(we, "wallpaper32.exe"), "-control openWallpaper -file \"" + wp + "\"");
+            StartWeIfNeeded(we);
+            var exe = File.Exists(Path.Combine(we, "wallpaper32.exe")) ? "wallpaper32.exe" : "wallpaper64.exe";
+            Process.Start(Path.Combine(we, exe), "-control openWallpaper -file \"" + wp + "\"");
             Log("已打开壁纸。");
         }
         catch (Exception ex) { MessageBox.Show("打开壁纸失败：" + ex.Message); }
@@ -437,6 +505,7 @@ class InstallerForm : Form
     [STAThread]
     static void Main(string[] args)
     {
+        try { SetProcessDPIAware(); } catch { }
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         var form = new InstallerForm();
