@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $localAppData = $env:LOCALAPPDATA; if (-not $localAppData) { $localAppData = [Environment]::GetFolderPath('LocalApplicationData') }; $logDir = Join-Path $localAppData 'MikuWallpaper'
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -196,14 +196,14 @@ try {
         $ws2 = New-Object -ComObject WScript.Shell
         $aiExe = Join-Path $bridgeDir 'AiSettings.exe'
         if (Test-Path $aiExe) {
-            foreach ($dir in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))) {
-                if (-not $dir) { continue }
+            $dir = [Environment]::GetFolderPath('Programs')
+            if ($dir) {
                 $lnk2 = $ws2.CreateShortcut((Join-Path $dir 'Miku 壁纸 AI 设置.lnk'))
                 $lnk2.TargetPath = $aiExe
                 $lnk2.WorkingDirectory = $bridgeDir
                 $lnk2.Save()
             }
-            Write-Host '已创建“Miku 壁纸 AI 设置”快捷方式。' -ForegroundColor Green
+            Write-Host '已在开始菜单创建“Miku 壁纸 AI 设置”快捷方式（不占桌面）。' -ForegroundColor Green
         }
     } catch {
         Write-Host '创建 AI 设置快捷方式失败（不影响壁纸）。' -ForegroundColor Yellow

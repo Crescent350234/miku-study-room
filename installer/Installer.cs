@@ -290,6 +290,13 @@ class InstallerForm : Form
             var watchdogExe = Path.Combine(bridgeDir, "watchdog.exe");
             if (File.Exists(watchdogExe)) StartHidden(watchdogExe, bridgeDir);
 
+            Directory.CreateDirectory(dataDir);
+            foreach (var extra in new string[] { "MikuTray.exe", "MikuLyrics.exe" })
+            {
+                var srcExtra = Path.Combine(baseDir, extra);
+                if (File.Exists(srcExtra)) File.Copy(srcExtra, Path.Combine(dataDir, extra), true);
+            }
+
             bool ok = false;
             foreach (var port in new int[] { 51789, 52789, 53789, 54789 })
             {
@@ -310,6 +317,9 @@ class InstallerForm : Form
 
             Log("应用壁纸...");
             Process.Start(Path.Combine(we, "wallpaper32.exe"), "-control openWallpaper -file \"" + Path.Combine(dst, "index.html") + "\"");
+
+            CreateStartMenuShortcut("Miku 控制中心.lnk", Path.Combine(dataDir, "MikuTray.exe"), dataDir);
+            CreateStartMenuShortcut("Miku 壁纸 AI 设置.lnk", Path.Combine(bridgeDir, "AiSettings.exe"), bridgeDir);
 
             if (chkAuto.Checked) CreateStartupShortcut("MikuWallpaperBridge.lnk", bridgeExe, bridgeDir, false);
             else RemoveStartupShortcut("MikuWallpaperBridge.lnk");
@@ -338,6 +348,24 @@ class InstallerForm : Form
             psi.UseShellExecute = true;
             psi.WindowStyle = ProcessWindowStyle.Hidden;
             Process.Start(psi);
+        }
+        catch { }
+    }
+
+    static void CreateStartMenuShortcut(string name, string target, string work)
+    {
+        try
+        {
+            if (!File.Exists(target)) return;
+            var programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+            if (string.IsNullOrEmpty(programs)) return;
+            var link = Path.Combine(programs, name);
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            var shell = Activator.CreateInstance(shellType);
+            var shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { link });
+            shortcut.GetType().InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { target });
+            shortcut.GetType().InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { work });
+            shortcut.GetType().InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
         }
         catch { }
     }
