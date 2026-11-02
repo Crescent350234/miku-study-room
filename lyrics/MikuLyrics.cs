@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -26,15 +25,21 @@ public class OverlayWindow : Window
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
     private StackPanel currentPanel;
-    private double fade = 0;
-    private int shownIndex = -1;
-    private double indexChangedAt = 0;
+    private List<CharAnim> anims = new List<CharAnim>();
     private string fontId = "sans";
     private string currentText = "";
     private string pushText = "";
     private DateTime pushAt = DateTime.MinValue;
     private DateTime pushTextAt = DateTime.MinValue;
+    private bool visibleWanted = false;
+    private string pos = "top";
+
+    private string baseUrl = "http://127.0.0.1:51789/";
+    private string statePath;
+
     private DispatcherTimer pushTimer;
+    private DispatcherTimer stateTimer;
+    private DispatcherTimer uiTimer;
 
     private class CharAnim
     {
@@ -48,29 +53,17 @@ public class OverlayWindow : Window
         public double Phase;
     }
 
-    private List<CharAnim> anims = new List<CharAnim>();
-
-    private string baseUrl = "http://127.0.0.1:51789/";
-    private string statePath;
-    private string songId = "";
-    private List<LrcLine> lines = new List<LrcLine>();
-    private DateTime songStarted = DateTime.Now;
-    private bool visibleWanted = false;
-    private string pos = "top";
-
-    private DispatcherTimer dataTimer;
-    private DispatcherTimer uiTimer;
-    private DispatcherTimer stateTimer;
-
-    private class LrcLine
+    private class FontPick
     {
-        public double T;
-        public string Text;
+        public FontFamily Family;
+        public FontWeight Weight;
+        public FontPick(FontFamily f, FontWeight w) { Family = f; Weight = w; }
     }
 
     public OverlayWindow()
     {
         ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -116,27 +109,20 @@ public class OverlayWindow : Window
 
         LoadState();
 
-        dataTimer = new DispatcherTimer();
-        dataTimer.Interval = TimeSpan.FromSeconds(1);
-        dataTimer.Tick += delegate { RefreshData(); };
-        dataTimer.Start();
-
-        uiTimer = new DispatcherTimer();
-        uiTimer.Interval = TimeSpan.FromMilliseconds(33);
-        uiTimer.Tick += delegate { Animate(); };
-        uiTimer.Start();
+        pushTimer = new DispatcherTimer();
+        pushTimer.Interval = TimeSpan.FromMilliseconds(150);
+        pushTimer.Tick += delegate { FetchPush(); };
+        pushTimer.Start();
 
         stateTimer = new DispatcherTimer();
         stateTimer.Interval = TimeSpan.FromMilliseconds(500);
         stateTimer.Tick += delegate { LoadState(); LoadUiFont(); };
         stateTimer.Start();
 
-        pushTimer = new DispatcherTimer();
-        pushTimer.Interval = TimeSpan.FromMilliseconds(250);
-        pushTimer.Tick += delegate { FetchPush(); };
-        pushTimer.Start();
-
-        RefreshData();
+        uiTimer = new DispatcherTimer();
+        uiTimer.Interval = TimeSpan.FromMilliseconds(33);
+        uiTimer.Tick += delegate { Animate(); };
+        uiTimer.Start();
     }
 
     private static string ResolveBase()
@@ -162,7 +148,7 @@ public class OverlayWindow : Window
             if (!File.Exists(statePath)) { ApplyVisible(false); return; }
             string json = File.ReadAllText(statePath);
             bool on = json.IndexOf("\"on\":true", StringComparison.Ordinal) >= 0;
-            string p = Field(json, "pos");
+            string p = StrField(json, "pos");
             if (!string.IsNullOrEmpty(p)) pos = p;
             ApplyVisible(on);
         }
@@ -175,14 +161,7 @@ public class OverlayWindow : Window
         if (on)
         {
             Show();
-            if (pos == "bottom")
-            {
-                Top = SystemParameters.WorkArea.Bottom - Height - 80;
-            }
-            else
-            {
-                Top = SystemParameters.WorkArea.Top + 40;
-            }
+            Top = pos == "bottom" ? SystemParameters.WorkArea.Bottom - Height - 80 : SystemParameters.WorkArea.Top + 40;
         }
         else
         {
@@ -197,7 +176,7 @@ public class OverlayWindow : Window
             var req = (HttpWebRequest)WebRequest.Create(baseUrl + path);
             req.Timeout = timeoutMs;
             req.ReadWriteTimeout = timeoutMs;
-            req.UserAgent = "MikuLyrics/1.0";
+            req.UserAgent = "MikuLyrics/2.0";
             using (var resp = (HttpWebResponse)req.GetResponse())
             using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
                 return sr.ReadToEnd();
@@ -205,132 +184,51 @@ public class OverlayWindow : Window
         catch { return null; }
     }
 
-    private void RefreshData()
+    private void FetchPush()
     {
         if (!visibleWanted) return;
-        LoadUiFont();
+        string j = Get("lyrics.json", 600);
+        if (string.IsNullOrEmpty(j)) return;
 
-        string json = Get("now.json", 1200);
-        if (string.IsNullOrEmpty(json)) return;
+        long ageMs = NumField(j, "age");
+        if (ageMs < 0 || ageMs > 2000) return;
 
-        string id = Field(json, "id");
-        string lrcUrl = Field(json, "lrc");
-
-        if (!string.IsNullOrEmpty(id) && id != songId)
+        string txt = StrField(j, "text");
+        pushAt = DateTime.Now;
+        if (txt != pushText)
         {
-            songId = id;
-            songStarted = DateTime.Now;
-            lines = new List<LrcLine>();
-            shownIndex = -1;
-            if (!string.IsNullOrEmpty(lrcUrl)) LoadLrc(lrcUrl);
+            pushText = txt;
+            pushTextAt = DateTime.Now;
+            Log(@"MikuWallpaper\lyrics-overlay-push.log", txt);
         }
     }
 
-    private void LoadLrc(string url)
+    private void LoadUiFont()
     {
-        try
+        string j = Get("ui.json", 800);
+        if (string.IsNullOrEmpty(j)) return;
+        string f = StrField(j, "font");
+        if (!string.IsNullOrEmpty(f) && f != fontId)
         {
-            var req = (HttpWebRequest)WebRequest.Create(url);
-            req.Timeout = 4000;
-            req.ReadWriteTimeout = 4000;
-            req.UserAgent = "MikuLyrics/1.0";
-            using (var resp = (HttpWebResponse)req.GetResponse())
-            using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-            {
-                string text = sr.ReadToEnd();
-                lines = ParseLrc(text);
-            }
+            fontId = f;
+            if (!string.IsNullOrEmpty(currentText)) SetScatter(currentText);
+            Log(@"MikuWallpaper\lyrics-overlay-font.log", "font=" + f);
         }
-        catch { }
-    }
-
-    private static readonly Regex TagRe = new Regex(@"\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]", RegexOptions.Compiled);
-
-    private static List<LrcLine> ParseLrc(string text)
-    {
-        var list = new List<LrcLine>();
-        if (string.IsNullOrEmpty(text)) return list;
-
-        foreach (string raw in text.Replace("\r", "").Split('\n'))
-        {
-            string line = raw.Trim();
-            if (line.Length < 5) continue;
-
-            var matches = TagRe.Matches(line);
-            if (matches.Count == 0) continue;
-
-            string content = TagRe.Replace(line, "").Trim();
-            if (content.Length == 0) continue;
-
-            foreach (Match m in matches)
-            {
-                int min = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
-                int sec = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
-                string frac = m.Groups[3].Value;
-                double ms = 0;
-                if (frac.Length == 1) ms = int.Parse(frac) * 100;
-                else if (frac.Length == 2) ms = int.Parse(frac) * 10;
-                else if (frac.Length >= 3) ms = int.Parse(frac.Substring(0, 3));
-                double t = min * 60 + sec + ms / 1000.0;
-                list.Add(new LrcLine { T = t, Text = content });
-            }
-        }
-
-        list.Sort(delegate (LrcLine a, LrcLine b) { return a.T.CompareTo(b.T); });
-        return list;
     }
 
     private void Animate()
     {
         if (!visibleWanted) return;
 
-        double pushAge = (DateTime.Now - pushAt).TotalSeconds;
-        if (pushAge < 3.0)
+        double age = (DateTime.Now - pushAt).TotalSeconds;
+        if (age > 2.5)
         {
-            if (currentText != pushText)
-            {
-                SetScatter(pushText);
-                pushTextAt = DateTime.Now;
-            }
-            double f = Math.Min(1.0, (DateTime.Now - pushTextAt).TotalSeconds / 0.35);
-            currentPanel.Opacity = f;
-            AnimateChars();
+            currentPanel.Opacity = 0;
             return;
         }
 
-        double posSec = (DateTime.Now - songStarted).TotalSeconds;
+        currentPanel.Opacity = Math.Min(1.0, (DateTime.Now - pushTextAt).TotalSeconds / 0.35);
 
-        int idx = -1;
-        for (int i = 0; i < lines.Count; i++)
-        {
-            if (lines[i].T <= posSec) idx = i;
-            else break;
-        }
-
-        if (idx != shownIndex)
-        {
-            shownIndex = idx;
-            indexChangedAt = posSec;
-            if (idx >= 0 && idx < lines.Count)
-            {
-                SetScatter(lines[idx].Text);
-            }
-            else
-            {
-                SetScatter("");
-            }
-            DebugLog(posSec, idx, idx >= 0 && idx < lines.Count ? lines[idx].Text : "");
-        }
-
-        double age = posSec - indexChangedAt;
-        fade = Math.Min(1.0, age / 0.35);
-        currentPanel.Opacity = fade;
-
-        AnimateChars();
-    }
-
-    private void AnimateChars()
-    {
         double t = DateTime.Now.TimeOfDay.TotalSeconds;
         for (int i = 0; i < anims.Count; i++)
         {
@@ -338,66 +236,6 @@ public class OverlayWindow : Window
             double ph = t * a.Speed + a.Phase;
             a.Tf.X = a.BaseX + Math.Sin(ph) * a.Ax;
             a.Tf.Y = a.BaseY + Math.Cos(ph * 1.13) * a.Ay;
-        }
-    }
-
-    private void FetchPush()
-    {
-        if (!visibleWanted) return;
-        string j = Get("lyrics.json", 700);
-        if (string.IsNullOrEmpty(j)) return;
-        long ageMs = NumField(j, "age");
-        if (ageMs > 3000) return;
-
-        string txt = Field(j, "text");
-        pushAt = DateTime.Now;
-        if (txt != pushText)
-        {
-            pushText = txt;
-            pushTextAt = DateTime.Now;
-            try
-            {
-                File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    @"MikuWallpaper\lyrics-overlay-push.log"),
-                    DateTime.Now.ToString("HH:mm:ss") + " " + txt, new UTF8Encoding(false));
-            }
-            catch { }
-        }
-    }
-
-    private class FontPick
-    {
-        public FontFamily Family;
-        public FontWeight Weight;
-        public FontPick(FontFamily f, FontWeight w) { Family = f; Weight = w; }
-    }
-
-    private static FontPick FontFor(string id)
-    {
-        switch (id)
-        {
-            case "kai": return new FontPick(new FontFamily("KaiTi"), FontWeights.Normal);
-            case "serif": return new FontPick(new FontFamily("SimSun"), FontWeights.Normal);
-            case "fangsong": return new FontPick(new FontFamily("FangSong"), FontWeights.Normal);
-            case "dengxian": return new FontPick(new FontFamily("DengXian"), FontWeights.Normal);
-            case "youyuan": return new FontPick(new FontFamily("YouYuan"), FontWeights.Normal);
-            case "mono": return new FontPick(new FontFamily("Consolas"), FontWeights.Normal);
-            case "lishu": return new FontPick(new FontFamily("LiSu"), FontWeights.Normal);
-            case "light": return new FontPick(new FontFamily("DengXian Light"), FontWeights.Light);
-            case "hei": return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Bold);
-            default: return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Light);
-        }
-    }
-
-    private void LoadUiFont()
-    {
-        string j = Get("ui.json", 1200);
-        if (string.IsNullOrEmpty(j)) return;
-        string f = Field(j, "font");
-        if (!string.IsNullOrEmpty(f) && f != fontId)
-        {
-            fontId = f;
-            if (!string.IsNullOrEmpty(currentText)) SetScatter(currentText);
         }
     }
 
@@ -410,9 +248,8 @@ public class OverlayWindow : Window
 
         var units = new List<string>();
         foreach (string part in Regex.Split(text, @"[，。！？、；：\s]+"))
-        {
             if (part.Length > 0) units.Add(part);
-        }
+
         if (units.Count < 3)
         {
             units.Clear();
@@ -422,14 +259,7 @@ public class OverlayWindow : Window
 
         int seed = text.GetHashCode();
         double baseSize = units.Count > 16 ? 28 : (units.Count > 11 ? 32 : 38);
-
-        try
-        {
-            File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                @"MikuWallpaper\lyrics-overlay-font.log"),
-                DateTime.Now.ToString("HH:mm:ss") + " font=" + fontId + " units=" + units.Count, new UTF8Encoding(false));
-        }
-        catch { }
+        var fp = FontFor(fontId);
 
         for (int i = 0; i < units.Count; i++)
         {
@@ -439,10 +269,9 @@ public class OverlayWindow : Window
 
             var tb = new TextBlock();
             tb.Text = units[i];
-            var fp = FontFor(fontId);
             tb.FontFamily = fp.Family;
-            tb.FontSize = baseSize * (0.9 + r * 0.6);
             tb.FontWeight = fp.Weight;
+            tb.FontSize = baseSize * (0.9 + r * 0.6);
             tb.Margin = new Thickness(0, 0, baseSize * 0.28, 0);
             tb.Foreground = new SolidColorBrush(Color.FromRgb(246, 252, 250));
             tb.Effect = new DropShadowEffect
@@ -480,36 +309,29 @@ public class OverlayWindow : Window
         }
     }
 
+    private static FontPick FontFor(string id)
+    {
+        switch (id)
+        {
+            case "kai": return new FontPick(new FontFamily("KaiTi"), FontWeights.Normal);
+            case "serif": return new FontPick(new FontFamily("SimSun"), FontWeights.Normal);
+            case "fangsong": return new FontPick(new FontFamily("FangSong"), FontWeights.Normal);
+            case "dengxian": return new FontPick(new FontFamily("DengXian"), FontWeights.Normal);
+            case "youyuan": return new FontPick(new FontFamily("YouYuan"), FontWeights.Normal);
+            case "mono": return new FontPick(new FontFamily("Consolas"), FontWeights.Normal);
+            case "lishu": return new FontPick(new FontFamily("LiSu"), FontWeights.Normal);
+            case "light": return new FontPick(new FontFamily("DengXian Light"), FontWeights.Light);
+            case "hei": return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Bold);
+            default: return new FontPick(new FontFamily("Microsoft YaHei UI"), FontWeights.Light);
+        }
+    }
+
     private static double Frac(double v)
     {
         return Math.Abs(v - Math.Truncate(v));
     }
 
-    private static void DebugLog(double posSec, int idx, string text)
-    {
-        try
-        {
-            string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                @"MikuWallpaper\lyrics-overlay.log");
-            File.WriteAllText(p, DateTime.Now.ToString("HH:mm:ss") + " pos=" + posSec.ToString("F1") +
-                " idx=" + idx + " lines=" + text, new UTF8Encoding(false));
-        }
-        catch { }
-    }
-
-    private static long NumField(string json, string key)
-    {
-        string pat = "\"" + key + "\":";
-        int i = json.IndexOf(pat, StringComparison.Ordinal);
-        if (i < 0) return -1;
-        i += pat.Length;
-        int start = i;
-        while (i < json.Length && (char.IsDigit(json[i]) || json[i] == '-')) i++;
-        long v;
-        return long.TryParse(json.Substring(start, i - start), out v) ? v : -1;
-    }
-
-    private static string Field(string json, string key)
+    private static string StrField(string json, string key)
     {
         string pat = "\"" + key + "\":\"";
         int i = json.IndexOf(pat, StringComparison.Ordinal);
@@ -524,6 +346,28 @@ public class OverlayWindow : Window
             sb.Append(c);
         }
         return sb.ToString();
+    }
+
+    private static long NumField(string json, string key)
+    {
+        string pat = "\"" + key + "\":";
+        int i = json.IndexOf(pat, StringComparison.Ordinal);
+        if (i < 0) return -1;
+        i += pat.Length;
+        int start = i;
+        while (i < json.Length && (char.IsDigit(json[i]) || json[i] == '-')) i++;
+        long v;
+        return long.TryParse(json.Substring(start, i - start), out v) ? v : -1;
+    }
+
+    private static void Log(string relativePath, string text)
+    {
+        try
+        {
+            string p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), relativePath);
+            File.WriteAllText(p, DateTime.Now.ToString("HH:mm:ss") + " " + text, new UTF8Encoding(false));
+        }
+        catch { }
     }
 
     [STAThread]
