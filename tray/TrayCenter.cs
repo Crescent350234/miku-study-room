@@ -79,7 +79,21 @@ public class TrayApp : ApplicationContext
         icon.Text = "Miku 控制中心";
         icon.ContextMenuStrip = menu;
         icon.Visible = true;
+        icon.ShowBalloonTip(3000, "Miku 控制中心", "左键或右键 M 图标：桌面歌词 / 纯净模式 / 切歌", ToolTipIcon.Info);
         icon.DoubleClick += delegate { Get("playpause"); };
+        icon.MouseClick += delegate (object s, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left) menu.Show(Cursor.Position);
+        };
+
+        try
+        {
+            var sb = new StringBuilder();
+            foreach (ToolStripItem it in menu.Items) sb.AppendLine(it.Text);
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "tray-menu.log"),
+                DateTime.Now.ToString("HH:mm:ss") + "\r\n" + sb.ToString(), new UTF8Encoding(false));
+        }
+        catch { }
 
         timer = new System.Windows.Forms.Timer();
         timer.Interval = 3000;

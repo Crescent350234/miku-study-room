@@ -710,6 +710,76 @@ internal static class Bridge
     }
 
 
+
+    private static string OverlayStatePath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            @"MikuWallpaper\overlay.json");
+    }
+
+    private static string OverlayJson()
+    {
+        try
+        {
+            string p = OverlayStatePath();
+            if (File.Exists(p))
+            {
+                string s = File.ReadAllText(p);
+                if (s.IndexOf("\"on\"", StringComparison.Ordinal) >= 0) return s;
+            }
+        }
+        catch { }
+        return "{\"on\":false,\"pos\":\"top\"}";
+    }
+
+    private static bool OverlayToggle()
+    {
+        bool on = false;
+        string pos = "top";
+        try
+        {
+            string p = OverlayStatePath();
+            if (File.Exists(p))
+            {
+                string s = File.ReadAllText(p);
+                on = s.IndexOf("\"on\":true", StringComparison.Ordinal) >= 0;
+                pos = s.IndexOf("\"pos\":\"bottom\"", StringComparison.Ordinal) >= 0 ? "bottom" : "top";
+            }
+            on = !on;
+            Directory.CreateDirectory(Path.GetDirectoryName(p));
+            File.WriteAllText(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos + "\"}", new UTF8Encoding(false));
+        }
+        catch { }
+        return on;
+    }
+
+    private static void EnsureOverlay()
+    {
+        try
+        {
+            if (Process.GetProcessesByName("MikuLyrics").Length > 0) return;
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] cands = new string[]
+            {
+                Path.Combine(baseDir, "MikuLyrics.exe"),
+                Path.Combine(baseDir, @"..\MikuLyrics.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\MikuLyrics.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\bridge\..\MikuLyrics.exe")
+            };
+            foreach (string c in cands)
+            {
+                string full = Path.GetFullPath(c);
+                if (!File.Exists(full)) continue;
+                var psi = new ProcessStartInfo(full, "");
+                psi.WorkingDirectory = Path.GetDirectoryName(full);
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+                return;
+            }
+        }
+        catch { }
+    }
+
     private static string GetHeader(string request, string name)
     {
         foreach (string line in request.Split('\n'))
@@ -859,6 +929,16 @@ internal static class Bridge
                         {
                             try { Process.Start(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AiSettings.exe")); } catch { }
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
+                        }
+                                                else if (path.StartsWith("/overlay.json"))
+                        {
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(OverlayJson()));
+                        }
+                        else if (path.StartsWith("/overlay.toggle"))
+                        {
+                            bool on = OverlayToggle();
+                            if (on) EnsureOverlay();
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"on\":" + (on ? "true" : "false") + "}"));
                         }
                         else if (path.StartsWith("/focus.json"))
                         {

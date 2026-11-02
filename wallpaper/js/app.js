@@ -2585,6 +2585,26 @@
           .catch(function () { toast('纯净模式切换失败'); });
       });
     }
+    var lyricsBtn = $('lyricsBtn');
+    if (lyricsBtn) {
+      var applyLyricsBtn = function (on) { lyricsBtn.classList.toggle('on', !!on); };
+      fetch(BRIDGE + 'overlay.json', { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { applyLyricsBtn(d.on); })
+        .catch(function () {});
+
+      lyricsBtn.addEventListener('click', function () {
+        if (!BRIDGE) { toast('桥接未运行'); return; }
+        fetch(BRIDGE + 'overlay.toggle', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            applyLyricsBtn(d.on);
+            toast(d.on ? '桌面歌词：已开启' : '桌面歌词：已关闭');
+          })
+          .catch(function () { toast('桌面歌词切换失败'); });
+      });
+    }
+
     var cleanCoverImg = $('cleanCoverImg');
     var cleanEye = $('cleanEye');
 
