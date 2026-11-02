@@ -25,12 +25,25 @@ public class OverlayWindow : Window
     private const int WS_EX_TOOLWINDOW = 0x80;
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
-    private TextBlock current;
+    private StackPanel currentPanel;
     private TextBlock next;
-    private TranslateTransform floatTf;
     private double fade = 0;
     private int shownIndex = -1;
     private double indexChangedAt = 0;
+
+    private class CharAnim
+    {
+        public TextBlock El;
+        public TranslateTransform Tf;
+        public double BaseX;
+        public double BaseY;
+        public double Ax;
+        public double Ay;
+        public double Speed;
+        public double Phase;
+    }
+
+    private List<CharAnim> anims = new List<CharAnim>();
 
     private string baseUrl = "http://127.0.0.1:51789/";
     private string statePath;
@@ -79,21 +92,11 @@ public class OverlayWindow : Window
         stack.VerticalAlignment = VerticalAlignment.Center;
         stack.IsHitTestVisible = false;
 
-        current = new TextBlock();
-        current.FontFamily = new FontFamily("Microsoft YaHei UI");
-        current.FontSize = 38;
-        current.FontWeight = FontWeights.Light;
-        current.Foreground = new SolidColorBrush(Color.FromRgb(246, 252, 250));
-        current.TextAlignment = TextAlignment.Center;
-        current.Effect = new DropShadowEffect
-        {
-            Color = Color.FromRgb(143, 240, 226),
-            BlurRadius = 22,
-            ShadowDepth = 0,
-            Opacity = 0.55
-        };
-        current.Opacity = 0;
-        current.RenderTransform = floatTf = new TranslateTransform();
+        currentPanel = new StackPanel();
+        currentPanel.Orientation = Orientation.Horizontal;
+        currentPanel.HorizontalAlignment = HorizontalAlignment.Center;
+        currentPanel.IsHitTestVisible = false;
+        currentPanel.Opacity = 0;
 
         next = new TextBlock();
         next.FontFamily = new FontFamily("Microsoft YaHei UI");
@@ -104,7 +107,7 @@ public class OverlayWindow : Window
         next.Margin = new Thickness(0, 10, 0, 0);
         next.Opacity = 0.0;
 
-        stack.Children.Add(current);
+        stack.Children.Add(currentPanel);
         stack.Children.Add(next);
         root.Children.Add(stack);
         Content = root;
@@ -295,24 +298,103 @@ public class OverlayWindow : Window
             indexChangedAt = posSec;
             if (idx >= 0 && idx < lines.Count)
             {
-                current.Text = lines[idx].Text;
+                SetScatter(lines[idx].Text);
                 next.Text = (idx + 1 < lines.Count) ? lines[idx + 1].Text : "";
             }
             else
             {
-                current.Text = "";
+                SetScatter("");
                 next.Text = "";
             }
-            DebugLog(posSec, idx, current.Text);
+            DebugLog(posSec, idx, idx >= 0 && idx < lines.Count ? lines[idx].Text : "");
         }
 
         double age = posSec - indexChangedAt;
         fade = Math.Min(1.0, age / 0.35);
-        current.Opacity = fade;
+        currentPanel.Opacity = fade;
         next.Opacity = fade * 0.55;
 
         double t = DateTime.Now.TimeOfDay.TotalSeconds;
-        floatTf.Y = Math.Sin(t * 1.6) * 5;
+        for (int i = 0; i < anims.Count; i++)
+        {
+            var a = anims[i];
+            double ph = t * a.Speed + a.Phase;
+            a.Tf.X = a.BaseX + Math.Sin(ph) * a.Ax;
+            a.Tf.Y = a.BaseY + Math.Cos(ph * 1.13) * a.Ay;
+        }
+    }
+
+    private void SetScatter(string text)
+    {
+        currentPanel.Children.Clear();
+        anims.Clear();
+        if (string.IsNullOrEmpty(text)) return;
+
+        var units = new List<string>();
+        foreach (string part in Regex.Split(text, @"[，。！？、；：\s]+"))
+        {
+            if (part.Length > 0) units.Add(part);
+        }
+        if (units.Count < 3)
+        {
+            units.Clear();
+            foreach (char ch in text)
+                if (!char.IsWhiteSpace(ch)) units.Add(ch.ToString());
+        }
+
+        int seed = text.GetHashCode();
+        double baseSize = units.Count > 16 ? 28 : (units.Count > 11 ? 32 : 38);
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            double r = Frac(Math.Sin(seed + i * 13) * 10000);
+            double r2 = Frac(Math.Sin(seed + i * 23) * 10000);
+            double r3 = Frac(Math.Sin(seed + i * 31) * 10000);
+
+            var tb = new TextBlock();
+            tb.Text = units[i];
+            tb.FontFamily = new FontFamily("Microsoft YaHei UI");
+            tb.FontSize = baseSize * (0.9 + r * 0.6);
+            tb.FontWeight = FontWeights.Light;
+            tb.Foreground = new SolidColorBrush(Color.FromRgb(246, 252, 250));
+            tb.Effect = new DropShadowEffect
+            {
+                Color = Color.FromRgb(143, 240, 226),
+                BlurRadius = 18,
+                ShadowDepth = 0,
+                Opacity = 0.5
+            };
+            tb.IsHitTestVisible = false;
+
+            double dx = (r2 - 0.5) * 18;
+            double dy = (r3 - 0.5) * 46;
+
+            var group = new TransformGroup();
+            group.Children.Add(new SkewTransform((r2 - 0.5) * 16, 0));
+            group.Children.Add(new RotateTransform((r - 0.5) * 32));
+            var tf = new TranslateTransform(dx, dy);
+            group.Children.Add(tf);
+            tb.RenderTransform = group;
+            tb.RenderTransformOrigin = new Point(0.5, 0.5);
+
+            currentPanel.Children.Add(tb);
+            anims.Add(new CharAnim
+            {
+                El = tb,
+                Tf = tf,
+                BaseX = dx,
+                BaseY = dy,
+                Ax = 4 + r * 10,
+                Ay = 3 + r2 * 9,
+                Speed = 2 * Math.PI / (3.2 + r * 4.5),
+                Phase = -r2 * 3
+            });
+        }
+    }
+
+    private static double Frac(double v)
+    {
+        return Math.Abs(v - Math.Truncate(v));
     }
 
     private static void DebugLog(double posSec, int idx, string text)
