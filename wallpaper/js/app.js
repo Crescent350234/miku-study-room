@@ -875,238 +875,6 @@
   }
 
 
-
-  function clearCylinder() {
-    var layer = $('cylLayer');
-    if (layer) layer.innerHTML = '';
-  }
-
-  function buildCylinderSvg() {
-    var NS = 'http://www.w3.org/2000/svg';
-    var svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 600 600');
-    svg.setAttribute('class', 'cyl5-svg');
-
-    function el(tag, attrs, parent) {
-      var n = document.createElementNS(NS, tag);
-      for (var k in attrs) n.setAttribute(k, attrs[k]);
-      (parent || svg).appendChild(n);
-      return n;
-    }
-
-    function noise(seed) {
-      var x = Math.sin(seed * 12.9898) * 43758.5453;
-      return x - Math.floor(x);
-    }
-
-    function roughCircle(cx, cy, r, seed, seg) {
-      var pts = [];
-      seg = seg || 72;
-      for (var i = 0; i < seg; i++) {
-        var a = i / seg * Math.PI * 2;
-        var rr = r + (noise(seed + i * 7.3) - 0.5) * 3.2;
-        pts.push([cx + Math.sin(a) * rr, cy - Math.cos(a) * rr]);
-      }
-      var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
-      for (var p = 1; p < pts.length; p++) d += ' L' + pts[p][0].toFixed(1) + ' ' + pts[p][1].toFixed(1);
-      return d + ' Z';
-    }
-
-    function gearPoints(cx, cy, rRoot, rOut, teeth, seed) {
-      var pts = [];
-      var step = Math.PI * 2 / teeth;
-      for (var i = 0; i < teeth; i++) {
-        var a = i * step;
-        var defs = [
-          [a, rRoot], [a + step * 0.24, rRoot], [a + step * 0.32, rOut],
-          [a + step * 0.68, rOut], [a + step * 0.76, rRoot], [a + step, rRoot]
-        ];
-        for (var k = 0; k < defs.length; k++) {
-          var ang = defs[k][0];
-          var rad = defs[k][1] + (noise(seed + i * 11 + k * 3.7) - 0.5) * 2.4;
-          pts.push([cx + Math.sin(ang) * rad, cy - Math.cos(ang) * rad]);
-        }
-      }
-      return pts;
-    }
-
-    function ptsToPath(pts) {
-      var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
-      for (var i = 1; i < pts.length; i++) d += ' L' + pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1);
-      return d + ' Z';
-    }
-
-    var line = 'rgba(226, 224, 214, 0.88)';
-    var soft = 'rgba(226, 224, 214, 0.34)';
-    var gearPts = gearPoints(300, 300, 268, 292, 24, 3.1);
-    var gear = ptsToPath(gearPts);
-
-    var defs = el('defs', {});
-
-    var mask = el('mask', { id: 'cylHollow', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: 600, height: 600 }, defs);
-    el('path', { d: gear, fill: '#fff' }, mask);
-    for (var c = 0; c < 6; c++) {
-      var ca = 30 + c * 60;
-      var cg = el('g', { transform: 'rotate(' + ca + ' 300 300)' }, mask);
-      el('circle', { cx: 300, cy: 112, r: 55, fill: '#000' }, cg);
-    }
-    el('circle', { cx: 300, cy: 300, r: 73, fill: '#000' }, mask);
-
-    // 轮体：深色，接近不透明
-    el('path', { d: gear, fill: 'rgba(10, 14, 14, 0.16)', mask: 'url(#cylHollow)' });
-
-    // 手绘外轮廓：两遍
-    el('path', { d: gear, fill: 'none', stroke: line, 'stroke-width': 1.5, 'stroke-linejoin': 'round' });
-    el('path', {
-      d: gear, fill: 'none', stroke: soft, 'stroke-width': 1,
-      transform: 'translate(1.4 1.1)'
-    });
-
-    // 排线阴影（两方向）
-    var clip = el('clipPath', { id: 'cylBodyClip' }, defs);
-    el('path', { d: gear, fill: '#fff' }, clip);
-
-    var hatch = el('g', { 'clip-path': 'url(#cylBodyClip)', mask: 'url(#cylHollow)' });
-    for (var h = 0; h < 40; h++) {
-      el('line', {
-        x1: -80 + h * 13, y1: -20,
-        x2: -80 + h * 13 + 430, y2: 640,
-        stroke: 'rgba(222, 220, 210, 0.10)', 'stroke-width': 1
-      }, hatch);
-    }
-    for (var h2 = 0; h2 < 26; h2++) {
-      el('line', {
-        x1: -20 + h2 * 20, y1: 620,
-        x2: -20 + h2 * 20 + 260, y2: -20,
-        stroke: 'rgba(222, 220, 210, 0.06)', 'stroke-width': 1
-      }, hatch);
-    }
-
-    // 内圈手绘线
-    el('path', { d: roughCircle(300, 300, 244, 9.2), fill: 'none', stroke: soft, 'stroke-width': 1 });
-    el('path', { d: roughCircle(300, 300, 228, 13.7), fill: 'none', stroke: soft, 'stroke-width': 1, 'stroke-dasharray': '4 7' });
-
-    // 弹膛：手绘双圈
-    for (var c2 = 0; c2 < 6; c2++) {
-      var ca2 = 30 + c2 * 60;
-      var g2 = el('g', { transform: 'rotate(' + ca2 + ' 300 300)' });
-      var dash = c2 === 0 ? '6 6' : 'none';
-      el('path', {
-        d: roughCircle(300, 112, 55, 21 + c2 * 3.3),
-        fill: 'none', stroke: line, 'stroke-width': 1.6, 'stroke-dasharray': dash
-      }, g2);
-      el('path', {
-        d: roughCircle(300, 112, 55, 21 + c2 * 3.3),
-        fill: 'none', stroke: soft, 'stroke-width': 1,
-        transform: 'translate(1.6 1.2)'
-      }, g2);
-      el('path', {
-        d: roughCircle(300, 112, 43, 31 + c2 * 3.3),
-        fill: 'none', stroke: soft, 'stroke-width': 1
-      }, g2);
-    }
-
-    // 辐条
-    for (var s = 0; s < 6; s++) {
-      var sa = 30 + s * 60;
-      var sg = el('g', { transform: 'rotate(' + sa + ' 300 300)' });
-      el('line', { x1: 300, y1: 176, x2: 300, y2: 222, stroke: soft, 'stroke-width': 1 }, sg);
-    }
-
-    // 中心小齿轮
-    var hub = ptsToPath(gearPoints(300, 300, 76, 88, 12, 41.7));
-    el('path', { d: hub, fill: 'none', stroke: line, 'stroke-width': 1.3 });
-    el('path', { d: hub, fill: 'none', stroke: soft, 'stroke-width': 1, transform: 'translate(1.2 1)' });
-    el('path', { d: roughCircle(300, 300, 55, 55.5), fill: 'none', stroke: soft, 'stroke-width': 1 });
-    el('path', { d: roughCircle(300, 300, 16, 61.1), fill: 'none', stroke: line, 'stroke-width': 1.2 });
-    el('circle', { cx: 300, cy: 300, r: 4, fill: 'rgba(230, 228, 218, 0.75)' });
-
-    return svg;
-  }
-
-
-  function buildCylinderLine(idx) {
-    var layer = $('cylLayer');
-    if (!layer) return;
-    if (idx < 0 || idx >= S.lrc.length) { return; }
-
-    layer.innerHTML = '';
-
-    var scene = document.createElement('div');
-    scene.className = 'cyl5-scene';
-
-    var wheel = document.createElement('div');
-    wheel.className = 'cyl5-wheel';
-
-    var rotor = document.createElement('div');
-    rotor.className = 'cyl5-rotor';
-    rotor.appendChild(buildCylinderSvg());
-
-    wheel.appendChild(rotor);
-    scene.appendChild(wheel);
-    layer.appendChild(scene);
-
-    var wheelW = wheel.getBoundingClientRect().width || 300;
-    var R = Math.max(100, Math.round(wheelW * 0.313));
-
-    var slots = [
-      { off: 0,  a: 90  },
-      { off: -1, a: 150 },
-      { off: -2, a: 210 },
-      { off: 1,  a: 330 },
-      { off: 2,  a: 270 }
-    ];
-
-    for (var s = 0; s < slots.length; s++) {
-      var li = idx + slots[s].off;
-      if (li < 0 || li >= S.lrc.length) continue;
-      var line = S.lrc[li];
-      if (!line || !line.text) continue;
-
-      var holder = document.createElement('div');
-      holder.className = 'cyl5-label' + (li === idx ? ' current' : '');
-      holder.style.cssText =
-        'position:absolute;left:50%;top:50%;transform-origin:0 50%;' +
-        'transform:rotate(' + slots[s].a + 'deg) translateY(-' + R + 'px) rotate(-90deg);';
-
-      var body = document.createElement('div');
-      body.className = 'cyl5-label-body';
-
-      var txt = document.createElement('span');
-      txt.className = 'cyl5-label-text';
-      txt.textContent = line.text;
-      txt.style.cssText =
-        'display:inline-block;white-space:nowrap;font-weight:300;letter-spacing:0.06em;' +
-        'font-size:' + (li === idx ? 26 : 20) + 'px;' +
-        'color:' + (li === idx ? '#8ff0e2' : 'rgba(228,236,232,0.42)') + ';';
-      body.appendChild(txt);
-
-      if (li === idx && line.sub) {
-        var sb = document.createElement('span');
-        sb.className = 'cyl5-label-sub';
-        sb.textContent = line.sub;
-        sb.style.cssText =
-          'display:block;white-space:nowrap;margin-top:6px;font-size:15px;' +
-          'color:rgba(200,222,216,0.55);';
-        body.appendChild(sb);
-      }
-
-      holder.appendChild(body);
-      if (li === idx) {
-        var d0 = 4;
-        if (S.lrc[idx + 1]) d0 = Math.max(2.8, Math.min(6, S.lrc[idx + 1].t - S.lrc[idx].t));
-        body.style.animationDuration = d0.toFixed(2) + 's';
-      }
-      rotor.appendChild(holder);
-    }
-
-    rotor.style.transform = 'rotate(60deg)';
-    requestAnimationFrame(function () {
-      rotor.style.transition = 'transform 0.62s cubic-bezier(0.18, 0.8, 0.22, 1)';
-      rotor.style.transform = 'rotate(0deg)';
-    });
-  }
-
   function buildQingshuLine(idx) {
     var nodes = el.lyrics.children;
     if (idx < 0 || idx >= nodes.length) return;
@@ -1465,7 +1233,6 @@
     if (S.lyricTheme === 'scatter') { buildScatterLine(idx); return; }
     if (S.lyricTheme === 'qingshu') { return; }
     
-    if (S.lyricTheme === 'cylinder') { buildCylinderLine(idx); return; }
     if (S.lyricTheme === 'bubble') return;
     return;
     var nodes = el.lyrics.children;
@@ -2079,7 +1846,7 @@
           el.lyrics.style.display = 'none';
           el.empty.style.display = 'none';
         }
-        if (p.spectrum && p.spectrum.value === false) {
+        if (p.spectrum && p.spectrum.value === false && el.spectrum) {
           el.spectrum.style.display = 'none';
         }
       }
@@ -2168,6 +1935,7 @@
   var specGrad = null;
 
   function sizeSpectrum() {
+    if (!el.spectrum) return;
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var w = window.innerWidth;
     var h = Math.max(90, Math.round(window.innerHeight * 0.118));
@@ -2307,11 +2075,6 @@
       item.imageOnly = true;
       item.poster = 'custom/bg.png';
       el.bgStill.src = 'custom/bg.png';
-      return;
-    }
-    if (item && item.custom) {
-      item.imageOnly = false;
-      applyBg(0);
     }
   });
 
@@ -2405,11 +2168,6 @@
     updateBubbles(dt);
     updateQingshu();
 
-    if (S.lyricTheme === 'cylinder' && S.lrc.length && (S.cylBuiltIdx !== S.lrcIndex || !cylLayer.children.length)) {
-      S.cylBuiltIdx = S.lrcIndex;
-      buildCylinderLine(S.lrcIndex >= 0 ? S.lrcIndex : 0);
-    }
-
     drawSpectrum(now);
 
     requestAnimationFrame(loop);
@@ -2488,32 +2246,6 @@
 
     var openGuideBtn = document.getElementById('openGuide');
     if (openGuideBtn) openGuideBtn.addEventListener('click', openMask);
-
-    window.__restartBridge = function () {
-      var rb = document.getElementById('restartBridge');
-      if (!rb) return;
-      rb.disabled = true;
-      rb.textContent = '重启中…';
-      fetch('http://127.0.0.1:51790/restart', { cache: 'no-store' })
-        .catch(function () {})
-        .then(function () {
-          setTimeout(function () { rb.disabled = false; rb.textContent = '重启桥接'; }, 2600);
-        });
-    };
-
-    var restartBridgeBtn = document.getElementById('restartBridge');
-    if (restartBridgeBtn) restartBridgeBtn.addEventListener('click', function () {
-      restartBridgeBtn.disabled = true;
-      restartBridgeBtn.textContent = '重启中…';
-      fetch('http://127.0.0.1:51790/restart', { cache: 'no-store' })
-        .catch(function () {})
-        .then(function () {
-          setTimeout(function () {
-            restartBridgeBtn.disabled = false;
-            restartBridgeBtn.textContent = '重启桥接';
-          }, 2600);
-        });
-    });
 
     var seen = false;
     try { seen = localStorage.getItem('onboarded') === '1'; } catch (e) {}
@@ -2649,8 +2381,7 @@
     { id: 'lumiere', name: '流光' },
     { id: 'scatter', name: '心象' },
     { id: 'tilt', name: '倾诉' },
-    { id: 'qingshu', name: '青书' },
-    { id: 'cylinder', name: '言弹' }
+    { id: 'qingshu', name: '青书' }
   ];
 
   function applyLyricTheme(id) {
@@ -2840,6 +2571,20 @@
   function start() {
     discoverBridgePort();
     var cleanBtn = $('cleanBtn');
+
+    var focusBtn = $('focusBtn');
+    if (focusBtn) {
+      focusBtn.addEventListener('click', function () {
+        if (!BRIDGE) { toast('桥接未运行'); return; }
+        fetch(BRIDGE + 'focus.toggle', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            focusBtn.classList.toggle('on', !!d.focus);
+            toast(d.focus ? '纯净模式：已隐藏桌面图标和任务栏' : '纯净模式：已恢复');
+          })
+          .catch(function () { toast('纯净模式切换失败'); });
+      });
+    }
     var cleanCoverImg = $('cleanCoverImg');
     var cleanEye = $('cleanEye');
 
@@ -2997,18 +2742,6 @@
       checkAi();
     };
 
-    window.__restartBridge = function () {
-      var rb = document.getElementById('restartBridge');
-      if (rb) { rb.disabled = true; rb.textContent = '重启中…'; }
-      fetch('http://127.0.0.1:51790/restart', { cache: 'no-store' })
-        .catch(function () {})
-        .then(function () {
-          setTimeout(function () {
-            if (rb) { rb.disabled = false; rb.textContent = '重启桥接'; }
-          }, 2600);
-        });
-    };
-
     if (obRetry) obRetry.addEventListener('click', checkBridge);
     if (obAiOpen) obAiOpen.addEventListener('click', function () {
       fetch(BRIDGE + 'ai.open', { cache: 'no-store' }).catch(function () {});
@@ -3023,5 +2756,20 @@
     if (!seen) setTimeout(window.__openGuide, 1500);
   });
 
+
+  window.__restartBridge = function () {
+    var rb = document.getElementById('restartBridge');
+    if (rb) { rb.disabled = true; rb.textContent = '重启中…'; }
+    var base = (typeof BRIDGE !== 'undefined' && BRIDGE) ? BRIDGE : 'http://127.0.0.1:51789/';
+    fetch(base + 'restart.all', { cache: 'no-store' })
+      .catch(function () {
+        return fetch('http://127.0.0.1:51790/restart', { cache: 'no-store' }).catch(function () {});
+      })
+      .then(function () {
+        setTimeout(function () {
+          if (rb) { rb.disabled = false; rb.textContent = '重启桥接'; }
+        }, 4500);
+      });
+  };
 
 })();

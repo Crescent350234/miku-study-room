@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta http-equiv="Cache-Control" content="no-store"><meta charset="utf-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Miku Study Room</title>
-<link rel="stylesheet" href="css/style.css?v=292">
+<link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
 
@@ -12,8 +12,6 @@
   <img id="bgStill" class="bg-still" alt="">
   <video id="bg" class="bg" muted loop playsinline autoplay preload="auto"></video>
   <div class="veil" aria-hidden="true"></div>
-
-  <canvas id="spectrum" aria-hidden="true"></canvas>
 
   <header class="hud">
     <div class="brand">
@@ -45,7 +43,6 @@
     </div>
   </header>
     <div id="qsLayer" class="qs-layer"></div>
-    <div id="cylLayer" class="cyl-layer"></div>
     <div id="bubbleLayer" class="bubble-layer"></div>
 
   <canvas id="fxCanvas"></canvas>
@@ -101,6 +98,9 @@
       <button class="ctl" id="next" aria-label="下一首">
         <svg viewBox="0 0 24 24"><rect x="16.8" y="5" width="2.4" height="14" rx="1.2"/><path d="M4 5.5v13a1 1 0 0 0 1.55.83l9.4-6.5a1 1 0 0 0 0-1.66l-9.4-6.5A1 1 0 0 0 4 5.5z"/></svg>
       </button>
+      <button class="ctl" id="focusBtn" aria-label="纯净模式" title="纯净模式（隐藏桌面图标和任务栏）">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 1.8v3.4M12 18.8v3.4M1.8 12h3.4M18.8 12h3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
       <button class="ctl" id="cleanBtn" aria-label="只看壁纸" title="只看壁纸（隐藏歌词与界面）">
         <svg viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
@@ -112,12 +112,6 @@
       </button>
     </div>
   </footer>
-
-
-  
-
-
-  
 
   <div class="start-hint" id="startHint">点播放器 ▶ 开始播放</div>
 <aside class="settings" id="settingsPanel">
@@ -174,7 +168,7 @@
 
   <audio id="audio" preload="auto"></audio>
 
-  <script src="js/app.js?v=293"></script>
+  <script src="js/app.js?v=238"></script>
   <div class="onboard-mask" id="onboardMask">
     <div class="onboard">
       <div class="onboard-title">开始使用 Miku Study Room</div>

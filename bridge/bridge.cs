@@ -860,6 +860,10 @@ internal static class Bridge
                             try { Process.Start(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AiSettings.exe")); } catch { }
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
                         }
+                        else if (path.StartsWith("/focus.json"))
+                        {
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"focus\":" + (FocusMode.IsOn ? "true" : "false") + "}"));
+                        }
                         else if (path.StartsWith("/focus.toggle")) { FocusMode.Toggle(); Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"focus\":" + (FocusMode.IsOn ? "true" : "false") + "}")); }
                                                 else if (path.StartsWith("/restart.all"))
                         {
