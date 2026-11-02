@@ -1285,7 +1285,7 @@
     if (!BRIDGE) return;
     var i = S.lrcIndex;
     var txt = (i >= 0 && S.lrc && S.lrc[i]) ? (S.lrc[i].text || '') : '';
-    fetch(BRIDGE + 'lyrics.push?pos=' + (S.position || 0).toFixed(2) + '&text=' + encodeURIComponent(txt), { cache: 'no-store' }).catch(function () {});
+    fetch(BRIDGE + 'lyrics.push?pos=' + (S.position || 0).toFixed(2) + '&text=' + encodeURIComponent(txt) + '&src=' + (S.pageId || (S.pageId = Math.random().toString(36).slice(2, 8))), { cache: 'no-store' }).catch(function () {});
   }
 
   function updateLyrics(time) {
@@ -2597,7 +2597,7 @@
       var i = S.lrcIndex;
       var txt = (i >= 0 && S.lrc[i]) ? (S.lrc[i].text || '') : '';
       var p = (S.position || 0).toFixed(2);
-      fetch(BRIDGE + 'lyrics.push?pos=' + p + '&text=' + encodeURIComponent(txt), { cache: 'no-store' }).catch(function () {});
+      fetch(BRIDGE + 'lyrics.push?pos=' + p + '&text=' + encodeURIComponent(txt) + '&src=' + (S.pageId || (S.pageId = Math.random().toString(36).slice(2, 8))), { cache: 'no-store' }).catch(function () {});
     }, 1500);
 
     setInterval(function () {

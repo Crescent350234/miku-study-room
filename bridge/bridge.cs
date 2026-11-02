@@ -133,6 +133,10 @@ internal static class Bridge
 
     private static string _acao = "null";
     private static string _lyricsText = "";
+    private static string _lyricsSrc = "";
+    private static bool _lyricsSrcSet = false;
+    private static long _pushCount = 0;
+    private static long _srcChanges = 0;
     private static double _lyricsPos = 0;
     private static DateTime _lyricsAt = DateTime.MinValue;
 
@@ -752,7 +756,7 @@ internal static class Bridge
         {
             StringBuilder sb = new StringBuilder();
             foreach (char ch in font.ToLowerInvariant())
-                if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) sb.Append(ch);
+                if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-') sb.Append(ch);
             string v = sb.ToString();
             if (v.Length == 0) return;
             _uiFont = v;
@@ -988,11 +992,36 @@ internal static class Bridge
                             string qs2 = qm2 >= 0 ? rawPath.Substring(qm2) : "";
                             string txt = QueryValue(qs2, "text");
                             string ps = QueryValue(qs2, "pos");
-                            _lyricsText = Uri.UnescapeDataString(txt ?? "");
-                            double pv;
-                            if (double.TryParse(ps, out pv)) _lyricsPos = pv;
-                            _lyricsAt = DateTime.UtcNow;
+                            string src = QueryValue(qs2, "src");
+                            bool accept = true;
+                            double staleness = (DateTime.UtcNow - _lyricsAt).TotalMilliseconds;
+                            if (_lyricsSrcSet && staleness < 8000 && src != _lyricsSrc) accept = false;
+                            if (accept)
+                            {
+                                if (!string.IsNullOrEmpty(src) && _lyricsSrc != src)
+                                {
+                                    _lyricsSrc = src;
+                                    _lyricsSrcSet = true;
+                                    _srcChanges++;
+                                }
+                                else if (!_lyricsSrcSet)
+                                {
+                                    _lyricsSrc = src ?? "";
+                                    _lyricsSrcSet = true;
+                                    _srcChanges++;
+                                }
+                                _lyricsText = Uri.UnescapeDataString(txt ?? "");
+                                double pv;
+                                if (double.TryParse(ps, out pv)) _lyricsPos = pv;
+                                _lyricsAt = DateTime.UtcNow;
+                                _pushCount++;
+                            }
                             Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
+                        }
+                        else if (path.StartsWith("/stats.json"))
+                        {
+                            Send(stream, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"pushes\":" + _pushCount + ",\"src\":\"" + Esc(_lyricsSrc) + "\",\"srcChanges\":" + _srcChanges + "}"));
                         }
                         else if (path.StartsWith("/lyrics.json"))
                         {
