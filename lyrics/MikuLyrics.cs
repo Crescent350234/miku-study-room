@@ -136,7 +136,7 @@ public class OverlayWindow : Window
 
         stateTimer = new DispatcherTimer();
         stateTimer.Interval = TimeSpan.FromMilliseconds(500);
-        stateTimer.Tick += delegate { LoadState(); LoadUiFont(); };
+        stateTimer.Tick += delegate { LoadState(); if (visibleWanted) LoadUiFont(); };
         stateTimer.Start();
 
         uiTimer = new DispatcherTimer();

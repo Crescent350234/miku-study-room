@@ -139,6 +139,7 @@ internal static class Bridge
     private static long _srcChanges = 0;
     private static double _lyricsPos = 0;
     private static DateTime _lyricsAt = DateTime.MinValue;
+    private static DateTime _pagePing = DateTime.MinValue;
 
     private static string Esc(string s)
     {
@@ -788,6 +789,22 @@ internal static class Bridge
         return "{\"on\":false,\"pos\":\"top\"}";
     }
 
+    private static void WriteAtomic(string path, string text, Encoding enc)
+    {
+        WriteAtomic(path, text);
+    }
+    private static void WriteAtomic(string path, string text)
+    {
+        try
+        {
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, text, new UTF8Encoding(false));
+            if (File.Exists(path)) File.Delete(path);
+            File.Move(tmp, path);
+        }
+        catch { }
+    }
+
     private static void SetOverlayPrefs(double? alpha, double? scale, string pos)
     {
         try
@@ -809,7 +826,7 @@ internal static class Bridge
             if (scale.HasValue) s = Math.Max(0.6, Math.Min(1.8, scale.Value));
             if (!string.IsNullOrEmpty(pos)) curPos = pos == "bottom" ? "bottom" : "top";
             Directory.CreateDirectory(Path.GetDirectoryName(p));
-            File.WriteAllText(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + curPos +
+            WriteAtomic(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + curPos +
                 "\",\"alpha\":" + a.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 ",\"scale\":" + s.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", new UTF8Encoding(false));
         }
@@ -835,7 +852,7 @@ internal static class Bridge
             }
             on = !on;
             Directory.CreateDirectory(Path.GetDirectoryName(p));
-            File.WriteAllText(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos +
+            WriteAtomic(p, "{\"on\":" + (on ? "true" : "false") + ",\"pos\":\"" + pos +
                 "\",\"alpha\":" + alpha.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 ",\"scale\":" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", new UTF8Encoding(false));
         }
@@ -903,6 +920,34 @@ internal static class Bridge
         return null;
     }
 
+    private static readonly string[] MusicExts = { ".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".opus" };
+
+    private static string MusicDir()
+    {
+        string d = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\music");
+        Directory.CreateDirectory(d);
+        return d;
+    }
+
+    private static string MusicJson()
+    {
+        try
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("[");
+            foreach (string f in Directory.GetFiles(MusicDir()))
+            {
+                string ext = Path.GetExtension(f).ToLowerInvariant();
+                if (Array.IndexOf(MusicExts, ext) < 0) continue;
+                if (sb.Length > 1) sb.Append(",");
+                sb.Append("{\"name\":\"").Append(Esc(Path.GetFileNameWithoutExtension(f)))
+                  .Append("\",\"file\":\"").Append(Esc(Path.GetFileName(f))).Append("\"}");
+            }
+            sb.Append("]");
+            return sb.ToString();
+        }
+        catch { return "[]"; }
+    }
     private static void Send403(NetworkStream stream)
     {
         byte[] b = Encoding.ASCII.GetBytes("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
@@ -1042,7 +1087,7 @@ internal static class Bridge
                             string src = QueryValue(qs2, "src");
                             bool accept = true;
                             double staleness = (DateTime.UtcNow - _lyricsAt).TotalMilliseconds;
-                            if (_lyricsSrcSet && staleness < 8000 && src != _lyricsSrc) accept = false;
+                            if (_lyricsSrcSet && staleness < 3000 && src != _lyricsSrc) accept = false;
                             if (accept)
                             {
                                 if (!string.IsNullOrEmpty(src) && _lyricsSrc != src)
@@ -1132,7 +1177,53 @@ internal static class Bridge
                                 Environment.Exit(0);
                             });
                         }
-                        else if (path.StartsWith("/hideicons")) WallpaperControl("hideIcons");
+                                                                                                else if (path.StartsWith("/page.ping"))
+                        {
+                            _pagePing = DateTime.UtcNow;
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
+                        }
+                        else if (path.StartsWith("/page.status"))
+                        {
+                            double age = _pagePing == DateTime.MinValue ? -1 : (DateTime.UtcNow - _pagePing).TotalSeconds;
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"age\":" + age.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}"));
+                        }                        else if (path.StartsWith("/playback.json"))
+                        {
+                            string pb = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\playback.json");
+                            string body = File.Exists(pb) ? File.ReadAllText(pb) : "{\"ok\":false}";
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(body));
+                        }else if (path.StartsWith("/playlists.json"))
+                        {
+                            string plPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"MikuWallpaper\playlists.json");
+                            string body = File.Exists(plPath) ? File.ReadAllText(plPath) : "{\"active\":\"meting\",\"playlists\":[]}";
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(body));
+                        }else if (path.StartsWith("/music.folder"))
+                        {
+                            try { Directory.CreateDirectory(MusicDir()); Process.Start("explorer.exe", "\"" + MusicDir() + "\""); } catch { }
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":true}"));
+                        }
+                        else if (path.StartsWith("/music.list"))
+                        {
+                            Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(MusicJson()));
+                        }
+                        else if (path.StartsWith("/music"))
+                        {
+                            int qm9 = rawPath.IndexOf('?');
+                            string qs9 = qm9 >= 0 ? rawPath.Substring(qm9) : "";
+                            string rawName = Uri.UnescapeDataString(QueryValue(qs9, "name") ?? "");
+                            string file = Path.GetFileName(rawName);
+                            string full = Path.Combine(MusicDir(), file);
+                            if (file.Length > 0 && File.Exists(full))
+                            {
+                                byte[] data = File.ReadAllBytes(full);
+                                string ext = Path.GetExtension(file).ToLowerInvariant();
+                                string mime = ext == ".flac" ? "audio/flac" : ext == ".wav" ? "audio/wav" : ext == ".m4a" ? "audio/mp4" : ext == ".ogg" || ext == ".opus" ? "audio/ogg" : "audio/mpeg";
+                                Send(stream, mime, data);
+                            }
+                            else
+                            {
+                                Send(stream, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"ok\":false}"));
+                            }
+                        }else if (path.StartsWith("/hideicons")) WallpaperControl("hideIcons");
                             else if (path.StartsWith("/showicons")) { if (!FocusMode.IsOn) WallpaperControl("showIcons"); }
                             Send(stream, "image/gif", Gif);
                         }

@@ -1,0 +1,39 @@
+/* 桌面播放器模式：透明背景，只留胶囊与歌词 */
+html.desktop-mode,
+html.desktop-mode body {
+  background: transparent !important;
+}
+
+html.desktop-mode .bg,
+html.desktop-mode .bg-still,
+html.desktop-mode .bg-fallback,
+html.desktop-mode .veil,
+html.desktop-mode .deco,
+html.desktop-mode .hud,
+html.desktop-mode #fxCanvas,
+html.desktop-mode #spectrum,
+html.desktop-mode #cleanCover,
+html.desktop-mode .start-hint,
+html.desktop-mode .onboard-mask {
+  display: none !important;
+}
+
+html.desktop-mode .lyrics-area {
+  z-index: 6;
+}
+
+html.desktop-mode .player {
+  bottom: calc(26 * var(--s));
+}
+
+html.desktop-mode .settings,
+html.desktop-mode .drawer {
+  z-index: 20;
+}
+
+
+/* 独立播放器运行时，壁纸隐藏自己的胶囊和歌词，避免两套 UI */
+body.desktop-player-active #player,
+body.desktop-player-active .lyrics-area {
+  display: none !important;
+}

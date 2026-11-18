@@ -247,9 +247,7 @@ body.mirror .mode-dot { background: var(--pink); box-shadow: 0 0 calc(10 * var(-
   font-size: calc(52 * var(--s));
   color: #ffffff;
   filter: none;
-  text-shadow:
-    0 0 calc(34 * var(--s)) rgba(57, 197, 187, 0.45),
-    0 calc(6 * var(--s)) calc(26 * var(--s)) rgba(0, 0, 0, 0.65);
+  text-shadow: 0 calc(6 * var(--s)) calc(26 * var(--s)) rgba(0, 0, 0, 0.65);
 }
 
 .line.past { opacity: 0.55; }
@@ -4081,18 +4079,31 @@ body.focus-on .drawer {
   padding: calc(10 * var(--s)) calc(18 * var(--s)) calc(6 * var(--s));
 }
 
-.pl-tools select {
-  flex: 1;
-  min-width: calc(130 * var(--s));
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: calc(8 * var(--s));
-  padding: calc(6 * var(--s)) calc(9 * var(--s));
-  font-size: calc(12 * var(--s));
+.pl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6 * var(--s));
+  width: 100%;
 }
 
-.pl-tools button {
+.pl-chip {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-radius: 999px;
+  padding: calc(5 * var(--s)) calc(12 * var(--s));
+  font-size: calc(12 * var(--s));
+  cursor: pointer;
+}
+
+.pl-chip.on {
+  background: var(--accent, #3cc5bb);
+  border-color: transparent;
+  color: #08110f;
+  font-weight: 600;
+}
+
+.pl-tools > button {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
@@ -4102,6 +4113,6 @@ body.focus-on .drawer {
   cursor: pointer;
 }
 
-.pl-tools button:hover {
+.pl-tools > button:hover {
   background: rgba(255, 255, 255, 0.14);
 }

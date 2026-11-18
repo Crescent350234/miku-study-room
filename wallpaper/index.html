@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Miku Study Room</title>
 <link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/v5.css?v=4">
+<link rel="stylesheet" href="css/desktop-mode.css?v=1">
 </head>
 <body>
 
@@ -133,6 +135,11 @@
     <div class="chip-row" id="overlaySizeChips"></div>
     <div class="style-title">歌词特效大小</div>
     <div class="chip-row" id="lyricScaleChips"></div>
+    <div class="style-title">内置音量</div>
+    <div class="vol-row">
+      <input type="range" id="volumeRange" min="0" max="100" step="1" value="100" aria-label="内置音量">
+      <span id="volumeVal">100%</span>
+    </div>
     <div class="ai-box">
       <div class="ai-title">AI 主题</div>
       <div id="aiState">读取中…</div>
@@ -165,15 +172,8 @@
       <button class="close" id="closeDrawer" aria-label="关闭">×</button>
     </div>
     <div class="pl-tools">
-      <select id="plSelect" aria-label="选择歌单"></select>
-      <button id="plNew">新建</button>
-      <button id="plImport">导入音乐</button>
-      <button id="plDel">删除</button>
-      <input type="file" id="plFile" accept="audio/*" multiple hidden>
-    </div>
-    <div class="scroll-pager">
-      <button id="pageUp" aria-label="上翻">▲ 上翻</button>
-      <button id="pageDown" aria-label="下翻">▼ 下翻</button>
+      <div class="pl-chips" id="plChips"></div>
+      <div class="pl-hint">歌单在托盘「歌单」里管理：新建 / 导入音乐 / 切换</div>
     </div>
     <ol class="playlist" id="playlist"></ol>
     <div class="scroll-rail" id="scrollRail"><div class="scroll-thumb" id="scrollThumb"></div></div>
@@ -184,7 +184,7 @@
 
   <audio id="audio" preload="auto"></audio>
 
-  <script src="js/app.js?v=254"></script>
+  <script src="js/app.js?v=286"></script>
   <div class="onboard-mask" id="onboardMask">
     <div class="onboard">
       <div class="onboard-title">开始使用 Miku Study Room</div>

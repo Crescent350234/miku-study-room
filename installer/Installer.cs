@@ -267,6 +267,20 @@ class InstallerForm : Form
         catch { }
     }
 
+    static void CleanupBackups()
+    {
+        try
+        {
+            var dirs = System.IO.Directory.GetDirectories(dataDir, "backup-*");
+            System.Array.Sort(dirs, System.StringComparer.Ordinal);
+            for (int i = 0; i < dirs.Length - 3; i++)
+            {
+                try { System.IO.Directory.Delete(dirs[i], true); } catch { }
+            }
+        }
+        catch { }
+    }
+
     static void CopyDir(string src, string dst)
     {
         Directory.CreateDirectory(dst);
@@ -310,7 +324,7 @@ class InstallerForm : Form
             }
             catch
             {
-                var psi = new ProcessStartInfo(Application.ExecutablePath, "--elevated");
+                var psi = new ProcessStartInfo(Application.ExecutablePath, "--elevated --install");
                 psi.Verb = "runas";
                 Process.Start(psi);
                 Log("已申请管理员权限，请在弹窗中继续。");
@@ -325,6 +339,7 @@ class InstallerForm : Form
                 {
                     var bak = Path.Combine(dataDir, "backup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
                     CopyDir(dst, bak);
+                    CleanupBackups();
                     Log("已备份旧版壁纸到 " + bak);
                 }
                 catch { Log("旧版备份失败，继续安装。"); }
@@ -361,6 +376,20 @@ class InstallerForm : Form
 
             var fontSrc = Path.Combine(baseDir, "fonts");
             if (Directory.Exists(fontSrc)) CopyDir(fontSrc, Path.Combine(dataDir, "fonts"));
+            var playerSrc = Path.Combine(baseDir, "player");
+            if (Directory.Exists(playerSrc))
+            {
+                var playerDst = Path.Combine(dataDir, "DesktopPlayer");
+                CopyDir(playerSrc, playerDst);
+                try
+                {
+                    File.WriteAllText(Path.Combine(playerDst, "overlay.ini"),
+                        "wallpaper=" + dst + "\r\n", new System.Text.UTF8Encoding(false));
+                }
+                catch { }
+                CreateStartMenuShortcut("Miku 桌面播放器.lnk", Path.Combine(playerDst, "MikuPlayer.exe"), playerDst);
+            }
+
 
             bool ok = false;
             foreach (var port in new int[] { 51789, 52789, 53789, 54789 })
